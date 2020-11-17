@@ -1,4 +1,5 @@
 import numpy as np
+import astropy.coordinates
 from astropy import units as u
 from astropy.time import Time
 from astropy.coordinates import get_body_barycentric
@@ -7,46 +8,90 @@ from astropy.coordinates import get_body_barycentric
 mSun=2e30
 lSun=3.826e26
 kpc=3e19
-AU=1.496e+11
 Gyr=3.15e16
 day=24*(60**2)
-year=365*day
 G=6.67e-11 # in SI
+# e - eccentricity of Earth's orbit
 e=0.0167
+# T - year in days
 T=365.2422
-year=T*24*(60**2)
+# year - year in seconds
+year=T*day
+# T0 - interval between last periapse before survey (2456662.00 BJD)
+# and start of survey (2456863.94 BJD) in days
 T0=201.938
+# AU - 1 astronomical unit in meters
 AU=1.496e+11
+# day - one day in seconds
 day=86400
+# c - speed of light in meters per second
 c=299792458
+# AU_c - time taken (here given in days) for light to travel from sun to Earth
 AU_c=AU/(c*day)
-#Galt=G/((kpc**3)/(mSun*(Gyr**2)))
-#M0=1e11*mSun # mass of MW internal to sun (only used in point mass potential, whichModel=0)
-#R0=15*kpc # approximate scale radius of MW NFW profile (from Piffl+2015)
-#rho0=2e7*mSun/(kpc**3) # approximate density of MW NFW profile (from Piffl+2015)
+# mas2rad - conversion factor which multiplies a value in milli-arcseconds to give radians
 mas2rad=4.84814e-9
+# mas2deg - conversion factor which multiplies a value in milli-arcseconds to give degrees
+mas2deg=mas2rad*180/np.pi
+
 
 #----------------
 #-User functions
 #----------------
-def params
+class params():
+    def __init__(self):
+        # astrometric parameters
+		self.RA = 45 # degree
+		self.Dec = 45 # degree
+		self.muRA = 0 # mas/year
+		self.muDec = 0 # mas/year
+		self.pllx = 1 # mas
+        # binary parameters
+		self.M = 1
+		self.a = 1
+        self.e = 0
+		self.q = 0
+        self.l = 0
+		self.vTheta = 45
+		self.vPhi = 45
+        self.twist = 0
+		self.phi0 = 0
 
+def path(ts,ps):
+    coord=astropy.coordinates.SkyCoord(ra=ps.RA*u.degree, dec=ps.Dec*u.degree,
+        pm_ra_cosdec=ps.muRA*np.cos(ps.Dec*np.pi/180)*u.mas/u.yr,
+        pm_dec=ps.muDec*u.mas/u.yr, frame='icrs')
+    bary=coord.barycentrictrueecliptic
+    polar=bary.lat.degree
+    azimuth=bary.lon.degree+75 # 75° is offset from periapse to equinox
+    pmPolar=bary.pm_lat.value # in mas/yr
+    pmAzimuth=bary.pm_lon_coslat.value/np.cos(polar*np.pi/180)
+    dAz,dPol=comMotion(ts,polar*np.pi/180,azimuth*np.pi/180,pmPolar,pmAzimuth,ps.pllx)
+    azs=azimuth+mas2deg*dAz # path of c.o.m. in degrees (barycentric true ecliptic)
+    pols=polar+mas2deg*dPol-75
+
+    coords=astropy.coordinates.SkyCoord(lon=azs*u.degree, lat=pols*u.degree, frame='barycentrictrueecliptic')
+    icrs=coords.icrs
+    ras=icrs.ra.degree
+    decs=icrs.decs.degree
+
+    return ras,dec
 #----------------
 #-On-sky motion
 #----------------
 
 # c.o.m motion in mas - all time in years, all angles mas except phi and theta (rad)
-def comMotion(ts,phi,theta,dA,dD,mA,mD,p):
-    taus=2*np.pi*(ts+T0/T)
+# needs azimuth and polar (0 to pi) in ecliptic coords with periapse at azimuth=0
+def comMotion(ts,azimuth,polar,muAzimuth,muPolar,pllx):
+    taus=2*np.pi*(ts+T0)/T
     tau0=2*np.pi*T0/T
-    psis=phi-taus
-    psi0=phi-tau0
-    dAs=dA+((ts-AU_c*np.cos(theta)*(np.cos(psis)-np.cos(psi0)
-        +e*(np.sin(taus)*np.sin(psis) - np.sin(tau0)*np.sin(psi0))))*mA
-        -(p/np.cos(theta))*(np.cos(psis)+e*(np.sin(taus)*np.sin(psis)-np.cos(phi))))
-    dDs=dD+((ts-AU_c*np.cos(theta)*(np.cos(psis)-np.cos(psi0)
-        +e*(np.sin(taus)*np.sin(psis) - np.sin(tau0)*np.sin(psi0))))*mD
-        -p*np.sin(theta)*(np.sin(psis)+e*(np.sin(taus)*np.cos(psis)+np.sin(phi))))
+    psis=azimuth-taus
+    psi0=azimuth-tau0
+    dAs=(ts-AU_c*np.cos(polar)*(np.cos(psis)-np.cos(psi0)
+        +e*(np.sin(taus)*np.sin(psis) - np.sin(tau0)*np.sin(psi0))))*muAzimuth
+        -(pllx/np.cos(polar))*(np.cos(psis)+e*(np.sin(taus)*np.sin(psis)-np.cos(azimuth)))
+    dDs=(ts-AU_c*np.cos(polar)*(np.cos(psis)-np.cos(psi0)
+        +e*(np.sin(taus)*np.sin(psis) - np.sin(tau0)*np.sin(psi0))))*muPolar
+        -pllx*np.sin(polar)*(np.sin(psis)+e*(np.sin(taus)*np.cos(psis)+np.sin(azimuth)))
     return dAs,dDs
 
 # binary orbit
