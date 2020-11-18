@@ -40,26 +40,26 @@ mas2deg=mas2rad*180/np.pi
 class params():
     def __init__(self):
         # astrometric parameters
-		self.RA = 45 # degree
-		self.Dec = 45 # degree
-		self.muRA = 0 # mas/year
-		self.muDec = 0 # mas/year
-		self.pllx = 1 # mas
+        self.RA = 45 # degree
+        self.Dec = 45 # degree
+        self.pmRA = 0 # mas/year
+        self.pmDec = 0 # mas/year
+        self.pllx = 1 # mas
         # binary parameters
-		self.M = 1
-		self.a = 1
+        self.M = 1
+        self.a = 1
         self.e = 0
-		self.q = 0
+        self.q = 0
         self.l = 0
-		self.vTheta = 45
-		self.vPhi = 45
+        self.vTheta = 45
+        self.vPhi = 45
         self.twist = 0
-		self.phi0 = 0
+        self.phi0 = 0
 
 def path(ts,ps):
     coord=astropy.coordinates.SkyCoord(ra=ps.RA*u.degree, dec=ps.Dec*u.degree,
-        pm_ra_cosdec=ps.muRA*np.cos(ps.Dec*np.pi/180)*u.mas/u.yr,
-        pm_dec=ps.muDec*u.mas/u.yr, frame='icrs')
+        pm_ra_cosdec=ps.pmRA*np.cos(ps.Dec*np.pi/180)*u.mas/u.yr,
+        pm_dec=ps.pmDec*u.mas/u.yr, frame='icrs')
     bary=coord.barycentrictrueecliptic
     polar=bary.lat.degree
     azimuth=bary.lon.degree+75 # 75° is offset from periapse to equinox
@@ -72,26 +72,26 @@ def path(ts,ps):
     coords=astropy.coordinates.SkyCoord(lon=azs*u.degree, lat=pols*u.degree, frame='barycentrictrueecliptic')
     icrs=coords.icrs
     ras=icrs.ra.degree
-    decs=icrs.decs.degree
+    decs=icrs.dec.degree
 
-    return ras,dec
+    return ras,decs
 #----------------
 #-On-sky motion
 #----------------
 
 # c.o.m motion in mas - all time in years, all angles mas except phi and theta (rad)
 # needs azimuth and polar (0 to pi) in ecliptic coords with periapse at azimuth=0
-def comMotion(ts,azimuth,polar,muAzimuth,muPolar,pllx):
+def comMotion(ts,polar,azimuth,muPolar,muAzimuth,pllx):
     taus=2*np.pi*(ts+T0)/T
     tau0=2*np.pi*T0/T
     psis=azimuth-taus
     psi0=azimuth-tau0
-    dAs=(ts-AU_c*np.cos(polar)*(np.cos(psis)-np.cos(psi0)
+    dAs=((ts-AU_c*np.cos(polar)*(np.cos(psis)-np.cos(psi0)
         +e*(np.sin(taus)*np.sin(psis) - np.sin(tau0)*np.sin(psi0))))*muAzimuth
-        -(pllx/np.cos(polar))*(np.cos(psis)+e*(np.sin(taus)*np.sin(psis)-np.cos(azimuth)))
-    dDs=(ts-AU_c*np.cos(polar)*(np.cos(psis)-np.cos(psi0)
+        -(pllx/np.cos(polar))*(np.cos(psis)+e*(np.sin(taus)*np.sin(psis)-np.cos(azimuth))))
+    dDs=((ts-AU_c*np.cos(polar)*(np.cos(psis)-np.cos(psi0)
         +e*(np.sin(taus)*np.sin(psis) - np.sin(tau0)*np.sin(psi0))))*muPolar
-        -pllx*np.sin(polar)*(np.sin(psis)+e*(np.sin(taus)*np.cos(psis)+np.sin(azimuth)))
+        -pllx*np.sin(polar)*(np.sin(psis)+e*(np.sin(taus)*np.cos(psis)+np.sin(azimuth))))
     return dAs,dDs
 
 # binary orbit
