@@ -10,7 +10,9 @@ lSun=3.826e26
 kpc=3e19
 Gyr=3.15e16
 day=24*(60**2)
-G=6.67e-11 # in SI
+G=6.67e-11
+AU=1.496e+11
+c=299792458
 # e - eccentricity of Earth's orbit
 e=0.0167
 # T - year in days
@@ -20,14 +22,10 @@ year=T*day
 # T0 - interval between last periapse before survey (2456662.00 BJD)
 # and start of survey (2456863.94 BJD) in days
 T0=201.938
-# AU - 1 astronomical unit in meters
-AU=1.496e+11
-# day - one day in seconds
-day=86400
-# c - speed of light in meters per second
-c=299792458
 # AU_c - time taken (here given in days) for light to travel from sun to Earth
 AU_c=AU/(c*day)
+# G in units of AU, years and solar masses
+Galt=G * AU**-3 * mSun**1 * year**2
 # mas2rad - conversion factor which multiplies a value in milli-arcseconds to give radians
 mas2rad=4.84814e-9
 # mas2deg - conversion factor which multiplies a value in milli-arcseconds to give degrees
@@ -46,38 +44,54 @@ class params():
         self.pmDec = 0 # mas/year
         self.pllx = 1 # mas
         # binary parameters
-        self.M = 1
-        self.a = 1
+        self.M = 1 # solar mass
+        self.a = 1 # AU
         self.e = 0
         self.q = 0
-        self.l = 0
+        self.l = 0 # assumed < 1 (though may not matter)
         self.vTheta = 45
         self.vPhi = 45
         self.twist = 0
-        self.phi0 = 0
+        self.t0 = 0 # years
 
 def path(ts,ps):
-    coord=astropy.coordinates.SkyCoord(ra=ps.RA*u.degree, dec=ps.Dec*u.degree,
-        pm_ra_cosdec=ps.pmRA*np.cos(ps.Dec*np.pi/180)*u.mas/u.yr,
-        pm_dec=ps.pmDec*u.mas/u.yr, frame='icrs')
+    # need to transofrm to eclitpic coords centered on periapse
+    # (natural frame for parralax ellipse) to find on-sky c.o.m motion
+    azimuth,polar,pmAzimuth,pmPolar=icrsToPercientric(ps.RA,ps.Dec,ps.pmRA,ps.pmDec)
+    # centre of mass motion in pericentric frame in mas
+    dAz,dPol=comMotion(ts,polar*np.pi/180,azimuth*np.pi/180,pmPolar,pmAzimuth,ps.pllx)
+    # and then tranform back
+    ras,decs=pericentricToIcrs(azimuth+mas2deg*dAz,polar+mas2deg*dPol)
+
+
+    ## extra c.o.l. correction due to binary
+    px1s,py1s,px2s,py2s,pxls,pyls=binaryMotion(ts-ps.t0,ps.M,ps.q,ps.l,ps.a,ps.e,ps.vTheta,ps.vPhi)
+    print('pxls ',pxls)
+    rls=mas2deg*ps.pllx*(pxls*np.cos(ps.twist)+pyls*np.sin(ps.twist))
+    dls=mas2deg*ps.pllx*(pyls*np.cos(ps.twist)-pxls*np.sin(ps.twist))
+
+    return ras+rls,decs+dls
+
+#----------------
+#-On-sky motion
+#----------------
+# 'pericentric' frame is in the ecliptic plane, with azimuth=0 at periapse
+def icrsToPercientric(ra,dec,pmra,pmdec):
+    coord=astropy.coordinates.SkyCoord(ra=ra*u.degree, dec=dec*u.degree,
+        pm_ra_cosdec=pmra*np.cos(dec*np.pi/180)*u.mas/u.yr,
+        pm_dec=pmdec*u.mas/u.yr, frame='icrs')
     bary=coord.barycentrictrueecliptic
     polar=bary.lat.degree
     azimuth=bary.lon.degree+75 # 75° is offset from periapse to equinox
     pmPolar=bary.pm_lat.value # in mas/yr
     pmAzimuth=bary.pm_lon_coslat.value/np.cos(polar*np.pi/180)
-    dAz,dPol=comMotion(ts,polar*np.pi/180,azimuth*np.pi/180,pmPolar,pmAzimuth,ps.pllx)
-    azs=azimuth+mas2deg*dAz-75 # path of c.o.m. in degrees (barycentric true ecliptic)
-    pols=polar+mas2deg*dPol
-
-    coords=astropy.coordinates.SkyCoord(lon=azs*u.degree, lat=pols*u.degree, frame='barycentrictrueecliptic')
+    return azimuth,polar,pmAzimuth,pmPolar
+def pericentricToIcrs(azimuth,polar):
+    coords=astropy.coordinates.SkyCoord(lon=(azimuth-75)*u.degree, lat=polar*u.degree, frame='barycentrictrueecliptic')
     icrs=coords.icrs
     ras=icrs.ra.degree
     decs=icrs.dec.degree
-
     return ras,decs
-#----------------
-#-On-sky motion
-#----------------
 
 # c.o.m motion in mas - all time in years, all angles mas except phi and theta (rad)
 # needs azimuth and polar (0 to pi) in ecliptic coords with periapse at azimuth=0
@@ -96,7 +110,7 @@ def comMotion(ts,polar,azimuth,muPolar,muAzimuth,pllx):
 
 # binary orbit
 def findEtas(ts,M,a,e,t0=0): # finds an (approximate) eccentric anomaly (see Penoyre & Sandford 2019, appendix A)
-    eta0s=np.sqrt(G*M/(a**3))*(ts-t0)
+    eta0s=np.sqrt(Galt*M/(a**3))*(ts-t0)
     eta1s=e*np.sin(eta0s)
     eta2s=(e**2)*np.sin(eta0s)*np.cos(eta0s)
     eta3s=(e**3)*np.sin(eta0s)*(1-(3/2)*np.sin(eta0s)**2)
@@ -112,28 +126,27 @@ def bodyPos(pxs,pys,l,q): # given the displacements transform to c.o.m. frame
 def binaryMotion(ts,M,q,l,a,e,vTheta,vPhi): # binary position (in projected AU)
     delta=np.abs(q-l)/((1+q)*(1+l))
     etas=findEtas(ts,M,a,e)
+    print('etas: ',etas)
     phis=2*np.arctan(np.sqrt((1+e)/(1-e))*np.tan(etas/2)) % (2*np.pi)
     vPsis=vPhi-phis
-
     rs=a*(1-e*np.cos(etas))
-
     g=np.power(1-(np.cos(vPhi)**2)*(np.sin(vTheta)**2),-0.5)
-
     # projected positions in the c.o.m frame (in AU)
     pxs=rs*g*(np.cos(phis)-np.cos(vPsis)*np.cos(vPhi)*(np.sin(vTheta)**2))
     pys=rs*g*np.sin(phis)*np.cos(vTheta)
-
     # positions of sources 1 and 2 and the center of light
     px1s,py1s,px2s,py2s,pxls,pyls=bodyPos(pxs,pys,l,q)
-    return px1s,py1s,px2s,py2s,pxls,pyls # x, y posn of each body and c.o.l.
+    # x, y posn of each body and c.o.l.
     # in on-sky coords such that x is projected onto i dirn and y has no i component
-# posn of earth
+    return px1s,py1s,px2s,py2s,pxls,pyls
+
+'''# posn of earth
 def get_R(mjd):
     R = get_body_barycentric('earth', Time(mjd, format='mjd', scale='tcb'),
                                   ephemeris="de430")
     return np.array([R.x.to(u.AU) / u.AU,
                      R.y.to(u.AU) / u.AU,
-                     R.z.to(u.AU) / u.AU]).T
+                     R.z.to(u.AU) / u.AU]).T'''
 
 
 # combination of both motions, as offset from phi, theta position relative to ecliptic
@@ -181,8 +194,8 @@ def Xij(ts,phi,theta):
 #----------------------
 #-Utilities
 #----------------------
-
-def sigString(number,significantFigures,extra=False): # returns a number to a given significant digits (if extra is true also returns base of first significant figure)
+# returns a number to a given significant digits (if extra true also returns exponent)
+def sigString(number,significantFigures,extra=False):
     roundingFactor=significantFigures - int(np.floor(np.log10(np.abs(number)))) - 1
     rounded=np.round(number, roundingFactor)
     # np.round retains a decimal point even if the number is an integer (i.e. we might expect 460 but instead get 460.0)
