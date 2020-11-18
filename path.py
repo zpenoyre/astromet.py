@@ -66,8 +66,8 @@ def path(ts,ps):
     pmPolar=bary.pm_lat.value # in mas/yr
     pmAzimuth=bary.pm_lon_coslat.value/np.cos(polar*np.pi/180)
     dAz,dPol=comMotion(ts,polar*np.pi/180,azimuth*np.pi/180,pmPolar,pmAzimuth,ps.pllx)
-    azs=azimuth+mas2deg*dAz # path of c.o.m. in degrees (barycentric true ecliptic)
-    pols=polar+mas2deg*dPol-75
+    azs=azimuth+mas2deg*dAz-75 # path of c.o.m. in degrees (barycentric true ecliptic)
+    pols=polar+mas2deg*dPol
 
     coords=astropy.coordinates.SkyCoord(lon=azs*u.degree, lat=pols*u.degree, frame='barycentrictrueecliptic')
     icrs=coords.icrs
@@ -82,7 +82,7 @@ def path(ts,ps):
 # c.o.m motion in mas - all time in years, all angles mas except phi and theta (rad)
 # needs azimuth and polar (0 to pi) in ecliptic coords with periapse at azimuth=0
 def comMotion(ts,polar,azimuth,muPolar,muAzimuth,pllx):
-    taus=2*np.pi*(ts+T0)/T
+    taus=2*np.pi*ts+(T0/T)
     tau0=2*np.pi*T0/T
     psis=azimuth-taus
     psi0=azimuth-tau0
