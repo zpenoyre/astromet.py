@@ -27,9 +27,9 @@ AU_c=AU/(c*day)
 # G in units of AU, years and solar masses
 Galt=G * AU**-3 * mSun**1 * year**2
 # mas2rad - conversion factor which multiplies a value in milli-arcseconds to give radians
-mas2rad=4.84814e-9
-# mas2deg - conversion factor which multiplies a value in milli-arcseconds to give degrees
-mas2deg=mas2rad*180/np.pi
+mas2rad=4.8481368110954e-9
+# mas - conversion factor which multiplies a value in milli-arcseconds to give degrees
+mas=mas2rad*180/np.pi
 
 
 #----------------
@@ -52,46 +52,81 @@ class params():
         self.vTheta = 45
         self.vPhi = 45
         self.twist = 0
-        self.t0 = 0 # years
+        self.tPeri = 0 # years
 
-def path(ts,ps):
-    # need to transofrm to eclitpic coords centered on periapse
+def path(ts,ps,t0=0):
+    '''# need to transofrm to eclitpic coords centered on periapse
     # (natural frame for parralax ellipse) to find on-sky c.o.m motion
     azimuth,polar,pmAzimuth,pmPolar=icrsToPercientric(ps.RA,ps.Dec,ps.pmRA,ps.pmDec)
     # centre of mass motion in pericentric frame in mas
     dAz,dPol=comMotion(ts,polar*np.pi/180,azimuth*np.pi/180,pmPolar,pmAzimuth,ps.pllx)
     # and then tranform back
-    ras,decs=pericentricToIcrs(azimuth+mas2deg*dAz,polar+mas2deg*dPol)
+    ras,decs=pericentricToIcrs(azimuth+mas*dAz,polar+mas*dPol)'''
+    dras,ddecs=comSimple(ts,ps.RA*np.pi/180,ps.Dec*np.pi/180,ps.pmRA,ps.pmDec,ps.pllx,t0=t0)
+    ras=ps.RA+dras
+    decs=ps.Dec+ddecs
 
-
-    ## extra c.o.l. correction due to binary
-    px1s,py1s,px2s,py2s,pxls,pyls=binaryMotion(ts-ps.t0,ps.M,ps.q,ps.l,ps.a,ps.e,ps.vTheta,ps.vPhi)
-    print('pxls ',pxls)
-    rls=mas2deg*ps.pllx*(pxls*np.cos(ps.twist)+pyls*np.sin(ps.twist))
-    dls=mas2deg*ps.pllx*(pyls*np.cos(ps.twist)-pxls*np.sin(ps.twist))
+    # extra c.o.l. correction due to binary
+    px1s,py1s,px2s,py2s,pxls,pyls=binaryMotion(ts-ps.tPeri,ps.M,ps.q,ps.l,ps.a,ps.e,ps.vTheta,ps.vPhi)
+    rls=mas*ps.pllx*(pxls*np.cos(ps.twist)+pyls*np.sin(ps.twist))
+    dls=mas*ps.pllx*(pyls*np.cos(ps.twist)-pxls*np.sin(ps.twist))
 
     return ras+rls,decs+dls
+
+def fit(ts,ras,decs,obsError=mas):
+    medRa=np.median(ras[0])
+    print('medRa: ',medRa)
+    medDec=np.median(decs[0])
+    diffRa=(ras-medRa)/mas
+    diffDec=(decs-medDec)/mas
+    xij=XijSimple(ts,medRa*np.pi/180,medDec*np.pi/180)
+    inv=np.linalg.inv(xij.T@xij)
+    params=inv@xij.T@np.hstack([diffRa,diffDec])
+    if np.isscalar(obsError):
+        obsError=np.diag(obsError**2*np.ones(2*ts.size))
+    paramError=inv@xij.T@obsError@xij@inv
+    return params,paramError
 
 #----------------
 #-On-sky motion
 #----------------
 # 'pericentric' frame is in the ecliptic plane, with azimuth=0 at periapse
-def icrsToPercientric(ra,dec,pmra,pmdec):
+def icrsToPercientric(ra,dec,pmra=0,pmdec=0):
     coord=astropy.coordinates.SkyCoord(ra=ra*u.degree, dec=dec*u.degree,
         pm_ra_cosdec=pmra*np.cos(dec*np.pi/180)*u.mas/u.yr,
         pm_dec=pmdec*u.mas/u.yr, frame='icrs')
     bary=coord.barycentrictrueecliptic
     polar=bary.lat.degree
     azimuth=bary.lon.degree+75 # 75° is offset from periapse to equinox
-    pmPolar=bary.pm_lat.value # in mas/yr
-    pmAzimuth=bary.pm_lon_coslat.value/np.cos(polar*np.pi/180)
-    return azimuth,polar,pmAzimuth,pmPolar
-def pericentricToIcrs(azimuth,polar):
-    coords=astropy.coordinates.SkyCoord(lon=(azimuth-75)*u.degree, lat=polar*u.degree, frame='barycentrictrueecliptic')
+    if (pmra==0) & (pmdec==0):
+        return azimuth,polar
+    else:
+        pmPolar=bary.pm_lat.value # in mas/yr
+        pmAzimuth=bary.pm_lon_coslat.value/np.cos(polar*np.pi/180)
+        return azimuth,polar,pmAzimuth,pmPolar
+def pericentricToIcrs(az,pol,pmaz=0,pmpol=0):
+    coords=astropy.coordinates.SkyCoord(lon=(az-75)*u.degree, lat=pol*u.degree,
+    pm_lon_coslat=pmaz*np.cos(pol*np.pi/180)*u.mas/u.yr,
+    pm_lat=pmpol*u.mas/u.yr, frame='barycentrictrueecliptic')
     icrs=coords.icrs
-    ras=icrs.ra.degree
-    decs=icrs.dec.degree
-    return ras,decs
+    ra=icrs.ra.degree
+    dec=icrs.dec.degree
+    if (pmaz==0) & (pmpol==0):
+        return ra,dec
+    else:
+        pmDec=bary.pm_dec.value # in mas/yr
+        pmRa=bary.pm_ra_cosdec.value/np.cos(dec*np.pi/180)
+        return ra,dec,pmRa,pmDec
+
+def barycentricPosition(time, bjdStart=2456863.94): # time in years after gaia start (2456863.94 BJD)
+    t=time*T + bjdStart
+    poss=astropy.coordinates.get_body_barycentric('earth', astropy.time.Time(t,format='jd'))
+    xs=poss.x.value # all in AU
+    ys=poss.y.value
+    zs=poss.z.value
+    # gaia satellite is at Earth-Sun L2
+    l2corr=1+np.power(3e-6/3,1/3) # 3(.003)e-6 is earth/sun mass ratio
+    return l2corr*np.vstack([xs,ys,zs]).T
 
 # c.o.m motion in mas - all time in years, all angles mas except phi and theta (rad)
 # needs azimuth and polar (0 to pi) in ecliptic coords with periapse at azimuth=0
@@ -107,10 +142,20 @@ def comMotion(ts,polar,azimuth,muPolar,muAzimuth,pllx):
         +e*(np.sin(taus)*np.sin(psis) - np.sin(tau0)*np.sin(psi0))))*muPolar
         -pllx*np.sin(polar)*(np.sin(psis)+e*(np.sin(taus)*np.cos(psis)+np.sin(azimuth))))
     return dAs,dDs
+# c.o.m motion in mas - all time in years, all angles mas except phi and theta (rad)
+# needs azimuth and polar (0 to pi) in ecliptic coords with periapse at azimuth=0
+def comSimple(ts,ra,dec,pmRa,pmDec,pllx,t0=0):
+    b0=barycentricPosition(t0)
+    bs=barycentricPosition(ts)
+    p0=np.array([-np.sin(ra),np.cos(ra),0])
+    q0=np.array([-np.cos(ra)*np.sin(dec),-np.sin(ra)*np.sin(dec),np.cos(dec)])
+    deltaRa=pmRa*(ts-t0) - (pllx/np.cos(dec))*np.dot(bs-b0,p0)
+    deltaDec=pmDec*(ts-t0) - pllx*np.dot(bs-b0,q0)
+    return mas*deltaRa,mas*deltaDec
 
 # binary orbit
-def findEtas(ts,M,a,e,t0=0): # finds an (approximate) eccentric anomaly (see Penoyre & Sandford 2019, appendix A)
-    eta0s=np.sqrt(Galt*M/(a**3))*(ts-t0)
+def findEtas(ts,M,a,e,tPeri=0): # finds an (approximate) eccentric anomaly (see Penoyre & Sandford 2019, appendix A)
+    eta0s=np.sqrt(Galt*M/(a**3))*(ts-tPeri)
     eta1s=e*np.sin(eta0s)
     eta2s=(e**2)*np.sin(eta0s)*np.cos(eta0s)
     eta3s=(e**3)*np.sin(eta0s)*(1-(3/2)*np.sin(eta0s)**2)
@@ -123,10 +168,9 @@ def bodyPos(pxs,pys,l,q): # given the displacements transform to c.o.m. frame
     pxls=-pxs*(l-q)/((1+l)*(1+q))
     pyls=-pys*(l-q)/((1+l)*(1+q))
     return px1s,py1s,px2s,py2s,pxls,pyls
-def binaryMotion(ts,M,q,l,a,e,vTheta,vPhi): # binary position (in projected AU)
+def binaryMotion(ts,M,q,l,a,e,vTheta,vPhi,tPeri=0): # binary position (in projected AU)
     delta=np.abs(q-l)/((1+q)*(1+l))
-    etas=findEtas(ts,M,a,e)
-    print('etas: ',etas)
+    etas=findEtas(ts,M,a,e,tPeri=tPeri)
     phis=2*np.arctan(np.sqrt((1+e)/(1-e))*np.tan(etas/2)) % (2*np.pi)
     vPsis=vPhi-phis
     rs=a*(1-e*np.cos(etas))
@@ -140,55 +184,40 @@ def binaryMotion(ts,M,q,l,a,e,vTheta,vPhi): # binary position (in projected AU)
     # in on-sky coords such that x is projected onto i dirn and y has no i component
     return px1s,py1s,px2s,py2s,pxls,pyls
 
-'''# posn of earth
-def get_R(mjd):
-    R = get_body_barycentric('earth', Time(mjd, format='mjd', scale='tcb'),
-                                  ephemeris="de430")
-    return np.array([R.x.to(u.AU) / u.AU,
-                     R.y.to(u.AU) / u.AU,
-                     R.z.to(u.AU) / u.AU]).T'''
-
-
-# combination of both motions, as offset from phi, theta position relative to ecliptic
-def fullMotion(ts,M,q,l,P,e,vTheta,vPhi,twist,phi,theta,muAlpha,muDelta,pllx,error,returnBinary=False,t0=0,dA=0,dD=0): # get c.o.l. motion w. binary and error (can get just c.o.m. w. error by setting q=l)
-
-    a=np.power((1+q)*G*M*((P*year)**2)/(2*np.pi)**2,1/3) # in m
-
-    cAlpha,cDelta=comMotion(ts,phi,theta,dA,dD,muAlpha,muDelta,pllx) # c.o.m. motion
-
-    px1s,py1s,px2s,py2s,pxls,pyls=binaryMotion((ts-t0)*year,M,q,l,a,e,vTheta,vPhi) # c.o.l. correction
-    rls=pllx*((pxls/AU)*np.cos(twist)+(pyls/AU)*np.sin(twist))
-    dls=pllx*((pyls/AU)*np.cos(twist)-(pxls/AU)*np.sin(twist))
-
-    rands=np.random.normal(loc=0,scale=error,size=ts.size) # astrometric error
-    dirs=2*np.pi*np.random.random(ts.size)
-    drs=np.cos(dirs)*rands
-    dds=np.sin(dirs)*rands
-    if returnBinary==True: # also returns the projected position of both bodies in the binary
-        fac1=q*(1+l)/(q-l)
-        fac2=l*(1+q)/(l-q)
-        return cAlpha+rls+drs, cDelta+dls+dds, cAlpha+fac1*rls+drs, cDelta+fac1*dls+dds, cAlpha+fac2*rls+drs, cDelta+fac2*dls+dds
-    else:
-        return cAlpha+rls+drs, cDelta+dls+dds
 
 #----------------------
 #-Fitting
 #----------------------
 def Xij(ts,phi,theta):
     N=ts.size
-    taus=2*np.pi*(ts+T0/T)
+    taus=2*np.pi*ts+(T0/T)
     tau0=2*np.pi*T0/T
     psis=phi-taus
     psi0=phi-tau0
+    tb=AU_c*np.cos(theta)*(np.cos(psis)-np.cos(psi0)
+        +e*(np.sin(taus)*np.sin(psis) - np.sin(tau0)*np.sin(psi0)))
     xij=np.zeros((2*N,5))
     xij[:N,0]=1
     xij[N:,1]=1
-    xij[:N,2]=ts-AU_c*np.cos(theta)*(np.cos(psis)-np.cos(psi0)
-        +e*(np.sin(taus)*np.sin(psis) - np.sin(tau0)*np.sin(psi0)))
-    xij[N:,3]=ts-AU_c*np.cos(theta)*(np.cos(psis)-np.cos(psi0)
-        +e*(np.sin(taus)*np.sin(psis) - np.sin(tau0)*np.sin(psi0)))
+    xij[:N,2]=ts-tb
+    xij[N:,3]=ts-tb
     xij[:N,4]=-(1/np.cos(theta))*(np.cos(psis)+e*(np.sin(taus)*np.sin(psis)-np.cos(phi)))
     xij[N:,4]=-np.sin(theta)*(np.sin(psis)+e*(np.sin(taus)*np.cos(psis)+np.sin(phi)))
+    return xij
+
+def XijSimple(ts,ra,dec,t0=0):
+    N=ts.size
+    b0=barycentricPosition(t0)
+    bs=barycentricPosition(ts)
+    p0=np.array([-np.sin(ra),np.cos(ra),0])
+    q0=np.array([-np.cos(ra)*np.sin(dec),-np.sin(ra)*np.sin(dec),np.cos(dec)])
+    xij=np.zeros((2*N,5))
+    xij[:N,0]=1
+    xij[N:,1]=1
+    xij[:N,2]=ts-t0
+    xij[N:,3]=ts-t0
+    xij[:N,4]=-(1/np.cos(dec))*np.dot(bs-b0,p0)
+    xij[N:,4]=-np.dot(bs-b0,q0)
     return xij
 
 #----------------------
