@@ -74,7 +74,6 @@ def comPath(ts,ps,t0=0):
 
 def fit(ts,ras,decs,obsError=1):
     medRa=np.median(ras[0])
-    print('medRa: ',medRa)
     medDec=np.median(decs[0])
     diffRa=(ras-medRa)/mas
     diffDec=(decs-medDec)/mas
