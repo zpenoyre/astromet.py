@@ -51,29 +51,28 @@ class params():
         self.l = 0 # assumed < 1 (though may not matter)
         self.vTheta = 45
         self.vPhi = 45
-        self.twist = 0
+        self.vOmega = 0
         self.tPeri = 0 # years
 
 def path(ts,ps,t0=0):
-    '''# need to transofrm to eclitpic coords centered on periapse
-    # (natural frame for parralax ellipse) to find on-sky c.o.m motion
-    azimuth,polar,pmAzimuth,pmPolar=icrsToPercientric(ps.RA,ps.Dec,ps.pmRA,ps.pmDec)
-    # centre of mass motion in pericentric frame in mas
-    dAz,dPol=comMotion(ts,polar*np.pi/180,azimuth*np.pi/180,pmPolar,pmAzimuth,ps.pllx)
-    # and then tranform back
-    ras,decs=pericentricToIcrs(azimuth+mas*dAz,polar+mas*dPol)'''
     dras,ddecs=comSimple(ts,ps.RA*np.pi/180,ps.Dec*np.pi/180,ps.pmRA,ps.pmDec,ps.pllx,t0=t0)
     ras=ps.RA+dras
     decs=ps.Dec+ddecs
 
     # extra c.o.l. correction due to binary
     px1s,py1s,px2s,py2s,pxls,pyls=binaryMotion(ts-ps.tPeri,ps.M,ps.q,ps.l,ps.a,ps.e,ps.vTheta,ps.vPhi)
-    rls=mas*ps.pllx*(pxls*np.cos(ps.twist)+pyls*np.sin(ps.twist))
-    dls=mas*ps.pllx*(pyls*np.cos(ps.twist)-pxls*np.sin(ps.twist))
+    rls=mas*ps.pllx*(pxls*np.cos(ps.vOmega)+pyls*np.sin(ps.vOmega))
+    dls=mas*ps.pllx*(pyls*np.cos(ps.vOmega)-pxls*np.sin(ps.vOmega))
 
     return ras+rls,decs+dls
 
-def fit(ts,ras,decs,obsError=mas):
+def comPath(ts,ps,t0=0):
+    dras,ddecs=comSimple(ts,ps.RA*np.pi/180,ps.Dec*np.pi/180,ps.pmRA,ps.pmDec,ps.pllx,t0=t0)
+    ras=ps.RA+dras
+    decs=ps.Dec+ddecs
+    return ras,decs
+
+def fit(ts,ras,decs,obsError=1):
     medRa=np.median(ras[0])
     print('medRa: ',medRa)
     medDec=np.median(decs[0])
@@ -87,36 +86,14 @@ def fit(ts,ras,decs,obsError=mas):
     paramError=inv@xij.T@obsError@xij@inv
     return params,paramError
 
+def period(ps):
+    totalMass=ps.M*(1+ps.q)
+    return np.sqrt(4*(np.pi**2)*(ps.a**3)/(Galt*totalMass))
+
 #----------------
 #-On-sky motion
 #----------------
-# 'pericentric' frame is in the ecliptic plane, with azimuth=0 at periapse
-def icrsToPercientric(ra,dec,pmra=0,pmdec=0):
-    coord=astropy.coordinates.SkyCoord(ra=ra*u.degree, dec=dec*u.degree,
-        pm_ra_cosdec=pmra*np.cos(dec*np.pi/180)*u.mas/u.yr,
-        pm_dec=pmdec*u.mas/u.yr, frame='icrs')
-    bary=coord.barycentrictrueecliptic
-    polar=bary.lat.degree
-    azimuth=bary.lon.degree+75 # 75° is offset from periapse to equinox
-    if (pmra==0) & (pmdec==0):
-        return azimuth,polar
-    else:
-        pmPolar=bary.pm_lat.value # in mas/yr
-        pmAzimuth=bary.pm_lon_coslat.value/np.cos(polar*np.pi/180)
-        return azimuth,polar,pmAzimuth,pmPolar
-def pericentricToIcrs(az,pol,pmaz=0,pmpol=0):
-    coords=astropy.coordinates.SkyCoord(lon=(az-75)*u.degree, lat=pol*u.degree,
-    pm_lon_coslat=pmaz*np.cos(pol*np.pi/180)*u.mas/u.yr,
-    pm_lat=pmpol*u.mas/u.yr, frame='barycentrictrueecliptic')
-    icrs=coords.icrs
-    ra=icrs.ra.degree
-    dec=icrs.dec.degree
-    if (pmaz==0) & (pmpol==0):
-        return ra,dec
-    else:
-        pmDec=bary.pm_dec.value # in mas/yr
-        pmRa=bary.pm_ra_cosdec.value/np.cos(dec*np.pi/180)
-        return ra,dec,pmRa,pmDec
+
 
 def barycentricPosition(time, bjdStart=2456863.94): # time in years after gaia start (2456863.94 BJD)
     t=time*T + bjdStart
@@ -128,20 +105,6 @@ def barycentricPosition(time, bjdStart=2456863.94): # time in years after gaia s
     l2corr=1+np.power(3e-6/3,1/3) # 3(.003)e-6 is earth/sun mass ratio
     return l2corr*np.vstack([xs,ys,zs]).T
 
-# c.o.m motion in mas - all time in years, all angles mas except phi and theta (rad)
-# needs azimuth and polar (0 to pi) in ecliptic coords with periapse at azimuth=0
-def comMotion(ts,polar,azimuth,muPolar,muAzimuth,pllx):
-    taus=2*np.pi*ts+(T0/T)
-    tau0=2*np.pi*T0/T
-    psis=azimuth-taus
-    psi0=azimuth-tau0
-    dAs=((ts-AU_c*np.cos(polar)*(np.cos(psis)-np.cos(psi0)
-        +e*(np.sin(taus)*np.sin(psis) - np.sin(tau0)*np.sin(psi0))))*muAzimuth
-        -(pllx/np.cos(polar))*(np.cos(psis)+e*(np.sin(taus)*np.sin(psis)-np.cos(azimuth))))
-    dDs=((ts-AU_c*np.cos(polar)*(np.cos(psis)-np.cos(psi0)
-        +e*(np.sin(taus)*np.sin(psis) - np.sin(tau0)*np.sin(psi0))))*muPolar
-        -pllx*np.sin(polar)*(np.sin(psis)+e*(np.sin(taus)*np.cos(psis)+np.sin(azimuth))))
-    return dAs,dDs
 # c.o.m motion in mas - all time in years, all angles mas except phi and theta (rad)
 # needs azimuth and polar (0 to pi) in ecliptic coords with periapse at azimuth=0
 def comSimple(ts,ra,dec,pmRa,pmDec,pllx,t0=0):
@@ -170,7 +133,7 @@ def bodyPos(pxs,pys,l,q): # given the displacements transform to c.o.m. frame
     return px1s,py1s,px2s,py2s,pxls,pyls
 def binaryMotion(ts,M,q,l,a,e,vTheta,vPhi,tPeri=0): # binary position (in projected AU)
     delta=np.abs(q-l)/((1+q)*(1+l))
-    etas=findEtas(ts,M,a,e,tPeri=tPeri)
+    etas=findEtas(ts,M*(1+q),a,e,tPeri=tPeri)
     phis=2*np.arctan(np.sqrt((1+e)/(1-e))*np.tan(etas/2)) % (2*np.pi)
     vPsis=vPhi-phis
     rs=a*(1-e*np.cos(etas))
@@ -184,27 +147,9 @@ def binaryMotion(ts,M,q,l,a,e,vTheta,vPhi,tPeri=0): # binary position (in projec
     # in on-sky coords such that x is projected onto i dirn and y has no i component
     return px1s,py1s,px2s,py2s,pxls,pyls
 
-
 #----------------------
 #-Fitting
 #----------------------
-def Xij(ts,phi,theta):
-    N=ts.size
-    taus=2*np.pi*ts+(T0/T)
-    tau0=2*np.pi*T0/T
-    psis=phi-taus
-    psi0=phi-tau0
-    tb=AU_c*np.cos(theta)*(np.cos(psis)-np.cos(psi0)
-        +e*(np.sin(taus)*np.sin(psis) - np.sin(tau0)*np.sin(psi0)))
-    xij=np.zeros((2*N,5))
-    xij[:N,0]=1
-    xij[N:,1]=1
-    xij[:N,2]=ts-tb
-    xij[N:,3]=ts-tb
-    xij[:N,4]=-(1/np.cos(theta))*(np.cos(psis)+e*(np.sin(taus)*np.sin(psis)-np.cos(phi)))
-    xij[N:,4]=-np.sin(theta)*(np.sin(psis)+e*(np.sin(taus)*np.cos(psis)+np.sin(phi)))
-    return xij
-
 def XijSimple(ts,ra,dec,t0=0):
     N=ts.size
     b0=barycentricPosition(t0)
@@ -279,3 +224,83 @@ def splitFit(xs): # fits a split normal distribution to an array of data
     Z=ks[np.argmin(np.abs(phi_ks))]
 
     return xs[Z],sigma,cigma
+
+#----------------------------------------------
+#- Legacy (old code I'm keeping for reference)
+#----------------------------------------------
+'''
+def path(ts,ps,t0=0):
+    # need to transofrm to eclitpic coords centered on periapse
+    # (natural frame for parralax ellipse) to find on-sky c.o.m motion
+    azimuth,polar,pmAzimuth,pmPolar=icrsToPercientric(ps.RA,ps.Dec,ps.pmRA,ps.pmDec)
+    # centre of mass motion in pericentric frame in mas
+    dAz,dPol=comMotion(ts,polar*np.pi/180,azimuth*np.pi/180,pmPolar,pmAzimuth,ps.pllx)
+    # and then tranform back
+    ras,decs=pericentricToIcrs(azimuth+mas*dAz,polar+mas*dPol)
+
+    # extra c.o.l. correction due to binary
+    px1s,py1s,px2s,py2s,pxls,pyls=binaryMotion(ts-ps.tPeri,ps.M,ps.q,ps.l,ps.a,ps.e,ps.vTheta,ps.vPhi)
+    rls=mas*ps.pllx*(pxls*np.cos(ps.vOmega)+pyls*np.sin(ps.vOmega))
+    dls=mas*ps.pllx*(pyls*np.cos(ps.vOmega)-pxls*np.sin(ps.vOmega))
+
+    return ras+rls,decs+dls
+
+# c.o.m motion in mas - all time in years, all angles mas except phi and theta (rad)
+# needs azimuth and polar (0 to pi) in ecliptic coords with periapse at azimuth=0
+def comMotion(ts,polar,azimuth,muPolar,muAzimuth,pllx):
+    taus=2*np.pi*ts+(T0/T)
+    tau0=2*np.pi*T0/T
+    psis=azimuth-taus
+    psi0=azimuth-tau0
+    dAs=((ts-AU_c*np.cos(polar)*(np.cos(psis)-np.cos(psi0)
+        +e*(np.sin(taus)*np.sin(psis) - np.sin(tau0)*np.sin(psi0))))*muAzimuth
+        -(pllx/np.cos(polar))*(np.cos(psis)+e*(np.sin(taus)*np.sin(psis)-np.cos(azimuth))))
+    dDs=((ts-AU_c*np.cos(polar)*(np.cos(psis)-np.cos(psi0)
+        +e*(np.sin(taus)*np.sin(psis) - np.sin(tau0)*np.sin(psi0))))*muPolar
+        -pllx*np.sin(polar)*(np.sin(psis)+e*(np.sin(taus)*np.cos(psis)+np.sin(azimuth))))
+    return dAs,dDs
+
+# 'pericentric' frame is in the ecliptic plane, with azimuth=0 at periapse
+def icrsToPercientric(ra,dec,pmra=0,pmdec=0):
+    coord=astropy.coordinates.SkyCoord(ra=ra*u.degree, dec=dec*u.degree,
+        pm_ra_cosdec=pmra*np.cos(dec*np.pi/180)*u.mas/u.yr,
+        pm_dec=pmdec*u.mas/u.yr, frame='icrs')
+    bary=coord.barycentrictrueecliptic
+    polar=bary.lat.degree
+    azimuth=bary.lon.degree+75 # 75° is offset from periapse to equinox
+    if (pmra==0) & (pmdec==0):
+        return azimuth,polar
+    else:
+        pmPolar=bary.pm_lat.value # in mas/yr
+        pmAzimuth=bary.pm_lon_coslat.value/np.cos(polar*np.pi/180)
+        return azimuth,polar,pmAzimuth,pmPolar
+def pericentricToIcrs(az,pol,pmaz=0,pmpol=0):
+    coords=astropy.coordinates.SkyCoord(lon=(az-75)*u.degree, lat=pol*u.degree,
+    pm_lon_coslat=pmaz*np.cos(pol*np.pi/180)*u.mas/u.yr,
+    pm_lat=pmpol*u.mas/u.yr, frame='barycentrictrueecliptic')
+    icrs=coords.icrs
+    ra=icrs.ra.degree
+    dec=icrs.dec.degree
+    if (pmaz==0) & (pmpol==0):
+        return ra,dec
+    else:
+        pmDec=bary.pm_dec.value # in mas/yr
+        pmRa=bary.pm_ra_cosdec.value/np.cos(dec*np.pi/180)
+        return ra,dec,pmRa,pmDec
+
+def Xij(ts,phi,theta):
+    N=ts.size
+    taus=2*np.pi*ts+(T0/T)
+    tau0=2*np.pi*T0/T
+    psis=phi-taus
+    psi0=phi-tau0
+    tb=AU_c*np.cos(theta)*(np.cos(psis)-np.cos(psi0)
+        +e*(np.sin(taus)*np.sin(psis) - np.sin(tau0)*np.sin(psi0)))
+    xij=np.zeros((2*N,5))
+    xij[:N,0]=1
+    xij[N:,1]=1
+    xij[:N,2]=ts-tb
+    xij[N:,3]=ts-tb
+    xij[:N,4]=-(1/np.cos(theta))*(np.cos(psis)+e*(np.sin(taus)*np.sin(psis)-np.cos(phi)))
+    xij[N:,4]=-np.sin(theta)*(np.sin(psis)+e*(np.sin(taus)*np.cos(psis)+np.sin(phi)))
+    return xij'''
