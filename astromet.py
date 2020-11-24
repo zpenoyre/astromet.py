@@ -19,9 +19,6 @@ e = 0.0167
 T = 365.2422
 # year - year in seconds
 year = T*day
-# T0 - interval between last periapse before survey (2456662.00 BJD)
-# and start of survey (2456863.94 BJD) in days
-T0 = 201.938
 # AU_c - time taken (here given in days) for light to travel from sun to Earth
 AU_c = AU/(c*day)
 # G in units of AU, years and solar masses
@@ -116,12 +113,11 @@ def barycentricPosition(time, bjdStart=2456863.94):  # time in years after gaia 
 
 
 def comSimple(ts, ra, dec, pmRa, pmDec, pllx, t0=0):
-    b0 = barycentricPosition(t0)
     bs = barycentricPosition(ts)
     p0 = np.array([-np.sin(ra), np.cos(ra), 0])
     q0 = np.array([-np.cos(ra)*np.sin(dec), -np.sin(ra)*np.sin(dec), np.cos(dec)])
-    deltaRa = pmRa*(ts-t0) - (pllx/np.cos(dec))*np.dot(bs-b0, p0)
-    deltaDec = pmDec*(ts-t0) - pllx*np.dot(bs-b0, q0)
+    deltaRa = pmRa*(ts-t0) - (pllx/np.cos(dec))*np.dot(bs, p0)
+    deltaDec = pmDec*(ts-t0) - pllx*np.dot(bs, q0)
     return mas*deltaRa, mas*deltaDec
 
 # binary orbit
@@ -168,7 +164,6 @@ def binaryMotion(ts, M, q, l, a, e, vTheta, vPhi, tPeri=0):  # binary position (
 
 def XijSimple(ts, ra, dec, t0=0):
     N = ts.size
-    b0 = barycentricPosition(t0)
     bs = barycentricPosition(ts)
     p0 = np.array([-np.sin(ra), np.cos(ra), 0])
     q0 = np.array([-np.cos(ra)*np.sin(dec), -np.sin(ra)*np.sin(dec), np.cos(dec)])
@@ -177,8 +172,8 @@ def XijSimple(ts, ra, dec, t0=0):
     xij[N:, 1] = 1
     xij[:N, 2] = ts-t0
     xij[N:, 3] = ts-t0
-    xij[:N, 4] = -(1/np.cos(dec))*np.dot(bs-b0, p0)
-    xij[N:, 4] = -np.dot(bs-b0, q0)
+    xij[:N, 4] = -(1/np.cos(dec))*np.dot(bs, p0)
+    xij[N:, 4] = -np.dot(bs, q0)
     return xij
 
 # ----------------------
@@ -252,6 +247,10 @@ def splitFit(xs):  # fits a split normal distribution to an array of data
 # - Legacy (old code I'm keeping for reference)
 # ----------------------------------------------
 '''
+# T0 - interval between last periapse before survey (2456662.00 BJD)
+# and start of survey (2456863.94 BJD) in days
+T0 = 201.938
+
 def path(ts,ps,t0=0):
     # need to transofrm to eclitpic coords centered on periapse
     # (natural frame for parralax ellipse) to find on-sky c.o.m motion
