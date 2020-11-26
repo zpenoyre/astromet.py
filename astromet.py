@@ -51,12 +51,29 @@ class params():
         self.vOmega = 0
         self.tPeri = 0  # years
 
+# epoch - zero time of observations in BJD (default is dr3 epoch 2016.0 CE)
+epoch = 2457388.5000000
+# I'm v. open to suggestion about better ways to set epoch!
+def setEpoch(newEpoch):
+    global epoch
+    if isinstance(newEpoch, str):
+        if 'dr3' in newEpoch.lower():
+            epoch=2457388.50
+        if 'dr2' in newEpoch.lower():
+            epoch=2457206.37
+        if 'dr1' in newEpoch.lower():
+            epoch=2457023.50
+    else:
+        epoch=newEpoch
 
-def path(ts, ps, t0=0):
-    dras, ddecs = comSimple(ts, ps.RA*np.pi/180, ps.Dec*np.pi/180,
-                            ps.pmRA, ps.pmDec, ps.pllx, t0=t0)
-    ras = ps.RA+dras
-    decs = ps.Dec+ddecs
+def path(ts, ps, comOnly=False, t0=0):
+    N=ts.size
+    xij=XijSimple(ts,ps.RA*np.pi/180,ps.Dec*np.pi/180, t0=t0)
+    r=np.array([0,0,ps.pmRA,ps.pmDec,ps.pllx])
+    pos=xij@r
+    ras,decs=ps.RA+mas*pos[:N], ps.Dec+mas*pos[N:]
+    if comOnly==True:
+        return ras,decs
 
     # extra c.o.l. correction due to binary
     px1s, py1s, px2s, py2s, pxls, pyls = binaryMotion(
@@ -74,8 +91,27 @@ def comPath(ts, ps, t0=0):
     decs = ps.Dec+ddecs
     return ras, decs
 
+def fit(ts,ras,decs,astError=1, t0=0):
+    # Error precision matrix
+    if np.isscalar(astError): # scalar astrometric error given
+        astPrec = np.diag((astError**-2)*np.ones(2*ts.size))
+    elif len(astError.shape)==1: # vector astrometric error given
+        astPrec = np.diag((astError**-2))
+    else:
+        astPrec=astError**-2
+    # convenient to work entirely in mas, relative to median RA and Dec
+    medRa = np.median(ras)
+    medDec = np.median(decs)
+    diffRa = (ras-medRa)/mas
+    diffDec = (decs-medDec)/mas
+    # Design matrix
+    xij=XijSimple(ts-t0,medRa*np.pi/180,medDec*np.pi/180)
+    # Astrometry covariance matrix
+    cov=np.linalg.inv(xij.T@astPrec@xij)
+    params=cov@xij.T@astPrec@np.hstack([diffRa,diffDec])
+    return params,cov
 
-def fit(ts, ras, decs, obsError=1, t0=0):
+'''def fit(ts, ras, decs, astError=1, t0=0):
     medRa = np.median(ras)
     medDec = np.median(decs)
     diffRa = (ras-medRa)/mas
@@ -83,10 +119,12 @@ def fit(ts, ras, decs, obsError=1, t0=0):
     xij = XijSimple(ts-t0, medRa*np.pi/180, medDec*np.pi/180)
     inv = np.linalg.inv(xij.T@xij)
     params = inv@xij.T@np.hstack([diffRa, diffDec])
-    if np.isscalar(obsError):
-        obsError = np.diag(obsError**2*np.ones(2*ts.size))
-    paramError = inv@xij.T@obsError@xij@inv
-    return params, paramError
+    if np.isscalar(astError): # scalar astrometric error given
+        astError = np.diag(astError*np.ones(2*ts.size))
+    if len(astError.shape)==1: # vector astrometric error given
+        astError = np.diag(astError)
+    paramError = inv@xij.T@(astError**2)@xij@inv
+    return params, paramError'''
 
 
 def period(ps):
@@ -96,9 +134,22 @@ def period(ps):
 # ----------------
 # -On-sky motion
 # ----------------
+def XijSimple(ts, ra, dec, t0=0):
+    N = ts.size
+    bs = barycentricPosition(ts,bjdStart=epoch)
+    p0 = np.array([-np.sin(ra), np.cos(ra), 0])
+    q0 = np.array([-np.cos(ra)*np.sin(dec), -np.sin(ra)*np.sin(dec), np.cos(dec)])
+    xij = np.zeros((2*N, 5))
+    xij[:N, 0] = 1
+    xij[N:, 1] = 1
+    xij[:N, 2] = ts-t0
+    xij[N:, 3] = ts-t0
+    xij[:N, 4] = -(1/np.cos(dec))*np.dot(bs, p0)
+    xij[N:, 4] = -np.dot(bs, q0)
+    return xij
 
 
-def barycentricPosition(time, bjdStart=2456863.94):  # time in years after gaia start (2456863.94 BJD)
+def barycentricPosition(time, bjdStart=epoch):  # time in years after gaia start (2456863.94 BJD)
     t = time*T + bjdStart
     poss = astropy.coordinates.get_body_barycentric('earth', astropy.time.Time(t, format='jd'))
     xs = poss.x.value  # all in AU
@@ -108,17 +159,6 @@ def barycentricPosition(time, bjdStart=2456863.94):  # time in years after gaia 
     l2corr = 1+np.power(3e-6/3, 1/3)  # 3(.003)e-6 is earth/sun mass ratio
     return l2corr*np.vstack([xs, ys, zs]).T
 
-# c.o.m motion in mas - all time in years, all angles mas except phi and theta (rad)
-# needs azimuth and polar (0 to pi) in ecliptic coords with periapse at azimuth=0
-
-
-def comSimple(ts, ra, dec, pmRa, pmDec, pllx, t0=0):
-    bs = barycentricPosition(ts)
-    p0 = np.array([-np.sin(ra), np.cos(ra), 0])
-    q0 = np.array([-np.cos(ra)*np.sin(dec), -np.sin(ra)*np.sin(dec), np.cos(dec)])
-    deltaRa = pmRa*(ts-t0) - (pllx/np.cos(dec))*np.dot(bs, p0)
-    deltaDec = pmDec*(ts-t0) - pllx*np.dot(bs, q0)
-    return mas*deltaRa, mas*deltaDec
 
 # binary orbit
 
@@ -157,24 +197,6 @@ def binaryMotion(ts, M, q, l, a, e, vTheta, vPhi, tPeri=0):  # binary position (
     # in on-sky coords such that x is projected onto i dirn and y has no i component
     return px1s, py1s, px2s, py2s, pxls, pyls
 
-# ----------------------
-# -Fitting
-# ----------------------
-
-
-def XijSimple(ts, ra, dec, t0=0):
-    N = ts.size
-    bs = barycentricPosition(ts)
-    p0 = np.array([-np.sin(ra), np.cos(ra), 0])
-    q0 = np.array([-np.cos(ra)*np.sin(dec), -np.sin(ra)*np.sin(dec), np.cos(dec)])
-    xij = np.zeros((2*N, 5))
-    xij[:N, 0] = 1
-    xij[N:, 1] = 1
-    xij[:N, 2] = ts-t0
-    xij[N:, 3] = ts-t0
-    xij[:N, 4] = -(1/np.cos(dec))*np.dot(bs, p0)
-    xij[N:, 4] = -np.dot(bs, q0)
-    return xij
 
 # ----------------------
 # -Utilities
@@ -281,6 +303,16 @@ def comMotion(ts,polar,azimuth,muPolar,muAzimuth,pllx):
         +e*(np.sin(taus)*np.sin(psis) - np.sin(tau0)*np.sin(psi0))))*muPolar
         -pllx*np.sin(polar)*(np.sin(psis)+e*(np.sin(taus)*np.cos(psis)+np.sin(azimuth))))
     return dAs,dDs
+
+# c.o.m motion in mas - all time in years, all angles mas except phi and theta (rad)
+# needs azimuth and polar (0 to pi) in ecliptic coords with periapse at azimuth=0
+def comSimple(ts, ra, dec, pmRa, pmDec, pllx, t0=0):
+    bs = barycentricPosition(ts)
+    p0 = np.array([-np.sin(ra), np.cos(ra), 0])
+    q0 = np.array([-np.cos(ra)*np.sin(dec), -np.sin(ra)*np.sin(dec), np.cos(dec)])
+    deltaRa = pmRa*(ts-t0) - (pllx/np.cos(dec))*np.dot(bs, p0)
+    deltaDec = pmDec*(ts-t0) - pllx*np.dot(bs, q0)
+    return mas*deltaRa, mas*deltaDec
 
 # 'pericentric' frame is in the ecliptic plane, with azimuth=0 at periapse
 def icrsToPercientric(ra,dec,pmra=0,pmdec=0):
