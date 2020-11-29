@@ -111,6 +111,16 @@ def fit(ts,ras,decs,astError=1, t0=0):
     params=cov@xij.T@astPrec@np.hstack([diffRa,diffDec])
     return params,cov
 
+def andyfit(ts,ras,decs,astError=1):
+    # Error precision matrix
+    obsPrec=np.diag(1/astError**2*np.ones(2*ts.size))
+    # Design matrix
+    xij=XijSimple(ts,ras*np.pi/180,decs*np.pi/180)
+    # Astrometry covariance matrix
+    cov=np.linalg.inv(xij.T@obsPrec@xij)
+    params=cov@xij.T@obsPrec@np.hstack([ras,decs])
+    return params,cov
+
 '''def fit(ts, ras, decs, astError=1, t0=0):
     medRa = np.median(ras)
     medDec = np.median(decs)
