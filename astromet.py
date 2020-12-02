@@ -88,12 +88,12 @@ def path(ts, ps, comOnly=False, t0=0):
     return ras+rls, decs+dls
 
 
-def comPath(ts, ps, t0=0):
+'''def comPath(ts, ps, t0=0):
     dras, ddecs = comSimple(ts, ps.RA*np.pi/180, ps.Dec*np.pi /
                             180, ps.pmRA, ps.pmDec, ps.pllx, t0=t0)
     ras = ps.RA+dras
     decs = ps.Dec+ddecs
-    return ras, decs
+    return ras, decs'''
 
 # For more details on the fit see section 1 of Hogg, Bovy & Lang 2010
 
@@ -134,6 +134,18 @@ def fit(ts, ras, decs, astError=1, t0=0):
     paramError = inv@xij.T@(astError**2)@xij@inv
     return params, paramError'''
 
+def uwe(ts,ras,decs,fitParams,astError=1):
+    nTs=ts.size
+    medRa = np.median(ras)
+    medDec = np.median(decs)
+    # Design matrix
+    xij = XijSimple(ts, medRa*np.pi/180, medDec*np.pi/180)
+    comPath=np.hstack([medRa*np.ones(nTs),medDec*np.ones(nTs)])
+
+    dRas=ras-medRa-mas*(xij@fitParams)[:nTs]
+    dDecs=decs-medDec-mas*(xij@fitParams)[nTs:]
+    diff=np.sqrt(dRas**2 + dDecs**2)
+    return np.sqrt(np.sum((diff/(mas*astError))**2)/(nTs-5))
 
 def period(ps):
     totalMass = ps.M*(1+ps.q)
