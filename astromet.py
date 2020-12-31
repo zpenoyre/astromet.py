@@ -177,7 +177,7 @@ def design_matrix(t, phi, ra, dec, t0=2016.0):
     Args:
         - t,       ndarray - Observation times, jyear.
         - phi,     ndarray - scan angles.
-        - ra, dec  float - reference right ascension and declination of source
+        - ra, dec  float - reference right ascension and declination of source, deg
     Returns:
         - design, ndarry - Design matrix
     """
@@ -197,8 +197,8 @@ def design_matrix(t, phi, ra, dec, t0=2016.0):
 
     # Construct design matrix
     design = np.zeros((t.shape[0], 5))
-    design[:,0] = sina*(3600.*1000)
-    design[:,1] = cosa*(3600.*1000)
+    design[:,0] = sina
+    design[:,1] = cosa
     design[:,2] = pifactor
     design[:,3] = sina*(t-t0)
     design[:,4] = cosa*(t-t0)

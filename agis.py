@@ -3,9 +3,14 @@ import astropy.coordinates
 from astropy import units as u
 from astropy.time import Time
 from astropy.coordinates import get_body_barycentric
+from astropy.coordinates import SkyCoord
 
 import astromet
 
+def get_obmt(times):
+    return 1717.6256+((np.array(times) + 2455197.5 - 2457023.5 - 0.25)*4)
+def get_gaiat(times):
+    return (np.array(times) - 1717.6256)/4 -  (2455197.5 - 2457023.5 - 0.25)
 
 def downweight(R, err, aen):
     """
@@ -53,7 +58,27 @@ def en_fit(R, err, w):
 
     return np.sqrt(y)
 
-def fit_model(x_obs, x_err, M_matrix):
+def agis_2d_prior(ra, dec, G):
+
+    coord=SkyCoord(ra, dec, unit='deg', frame='icrs')
+    _l=coord.galactic.l.rad; _b=coord.galactic.b.rad
+
+    # Prior
+    s0 = 2.187 - 0.2547*G + 0.006382*G**2
+    s1 = 0.114 - 0.0579*G + 0.01369*G**2 - 0.000506*G**3
+    s2 = 0.031 - 0.0062*G
+    sigma_pi_f90 = 10**(s0 + s1*np.abs(np.sin(_b)) + s2*np.cos(_b)*np.cos(_l))
+
+    prior_cov = np.eye(5)
+    prior_cov[:2,:2] *= 1000**2
+    prior_cov[2:4,2:4] *= sigma_pi_f90**2
+    prior_cov[4,4] *= (10*sigma_pi_f90)**2
+
+    prior_prec = np.linalg.inv(prior_cov)
+
+    return prior_prec
+
+def fit_model(x_obs, x_err, M_matrix, prior=None):
     """
     Iterative optimization to fit astrometric solution in AGIS (outer iteration). Lindegren 2012.
     Args:
@@ -67,38 +92,49 @@ def fit_model(x_obs, x_err, M_matrix):
         - aen_i
         - W_i
     """
-    # Initialise
+
+    if prior is None: prior=np.zeros((5,5))
+
+    # Initialise - get initial astrometry estimate with weights=1
     aen = 0
     weights = np.ones(len(x_obs))
     W = np.eye(len(x_obs))*weights/(x_err**2 + aen)
+    r5d_cov = np.linalg.inv(np.matmul(M_matrix.T, np.matmul(W, M_matrix))+prior)
+    r5d_mean = np.matmul(r5d_cov, np.matmul(M_matrix.T, np.matmul(W, x_obs)))
+    R = x_obs - np.matmul(M_matrix, r5d_mean)
+
+    # Step 1: initial Weights
+    # Intersextile range
+    ISR = np.diff(np.percentile(R, [100.*1./6, 100.*5./6.]))[0]
+    # Evaluate weights
+    weights = downweight(R, ISR/2., 0.)
 
     for ii in range(10):
 
         # Step 2 - Astrometry linear regression
-        r5d_cov = np.linalg.inv(np.matmul(M_matrix.T, np.matmul(W, M_matrix)))
+        W = np.eye(len(x_obs))*weights/(x_err**2 + aen)
+        r5d_cov = np.linalg.inv(np.matmul(M_matrix.T, np.matmul(W, M_matrix))+prior)
         r5d_mean = np.matmul(r5d_cov, np.matmul(M_matrix.T, np.matmul(W, x_obs)))
         R = x_obs - np.matmul(M_matrix, r5d_mean)
 
-        # Step 3 - Observation Weights
-        weights = downweight(R, x_err, aen)
-        W = np.eye(len(x_obs))*weights/(x_err**2 + aen)
-
-        # Step 4 - astrometric_excess_noise
+        # Step 3 - astrometric_excess_noise
         aen = en_fit(R, x_err, weights)
 
-        # Step 1 - Observation weights
+        # Step 4 - Observation Weights
         weights = downweight(R, x_err, aen)
-        W = np.eye(len(x_obs))*weights/(x_err**2 + aen)
+
+        # Step 3 - astrometric_excess_noise
+        aen = en_fit(R, x_err, weights)
 
     # Final Astrometry Linear Regression fit
-    r5d_cov = np.linalg.inv(np.matmul(M_matrix.T, np.matmul(W, M_matrix)))
+    r5d_cov = np.linalg.inv(np.matmul(M_matrix.T, np.matmul(W, M_matrix))+prior)
     r5d_mean = np.matmul(r5d_cov, np.matmul(M_matrix.T, np.matmul(W, x_obs)))
     R = x_obs - np.matmul(M_matrix, r5d_mean)
 
     return r5d_mean, r5d_cov, R, aen, weights
 
 
-def agis(r5d, t, phi, x_err, extra=None, t0=2015.5):
+def agis(r5d, t, phi, x_err, extra=None, t0=2015.5, G=None):
     """
     Iterative optimization to fit astrometric solution in AGIS (outer iteration). Lindegren 2012.
     Args:
@@ -111,10 +147,31 @@ def agis(r5d, t, phi, x_err, extra=None, t0=2015.5):
         - gaia_dr2, dict - output data Gaia would produce
     """
 
+    results = {}
+    results['astrometric_matched_transits']     = len(t)
+    results['visibility_periods_used'] = np.sum(np.sort(t)[1:]*astromet.T-np.sort(t)[:-1]*astromet.T>4)
+
+    t = np.repeat(t, 9)
+    phi = np.repeat(phi, 9)
+    x_err = np.repeat(x_err, 9)
+
+    results['astrometric_n_obs_al']     = len(t)
+
+    # Add prior on components if fewer that 6 visibility periods
+    if results['visibility_periods_used']<6:
+        prior = agis_2d_prior(r5d[0], r5d[1], G)
+        results['astrometric_params_solved']=3
+    else:
+        prior = np.zeros((5,5))
+        results['astrometric_params_solved']=31
+
     # Design matrix
     design = astromet.design_matrix(t, phi, r5d[0], r5d[1], t0=t0)
 
-    # Astrometric position of source - UNITS??
+    # Transform ra,dec to arcsec
+    r5d[:2] = r5d[:2]*(3600*1000)
+
+    # Astrometric position of source
     x_obs  = np.matmul(design, r5d)
     # Excess motion
     if extra is not None:
@@ -122,9 +179,10 @@ def agis(r5d, t, phi, x_err, extra=None, t0=2015.5):
     # Measurement Error
     x_obs += np.random.normal(0, x_err)
 
-    r5d_mean, r5d_cov, R, aen, weights = fit_model(x_obs, x_err, design)
+    r5d_mean, r5d_cov, R, aen, weights = fit_model(x_obs, x_err, design, prior=prior)
+    # Transform ra,dec to degrees
+    r5d_mean[:2] = r5d[:2]/(3600*1000)
 
-    results = {}
     coords = ['ra', 'dec', 'parallax', 'pmra', 'pmdec']
     for i in range(5):
         results[coords[i]] = r5d_mean[i]
@@ -135,8 +193,6 @@ def agis(r5d, t, phi, x_err, extra=None, t0=2015.5):
 
     results['astrometric_excess_noise'] = aen
     results['astrometric_chi2_al']      = np.sum(R**2 / x_err**2)
-    results['astrometric_n_obs_al']     = len(t)
     results['astrometric_n_good_obs_al']= np.sum(weights>0.2)
-    results['visibility_periods_used'] = np.sum(np.sort(t)[1:]*astromet.T-np.sort(t)[:-1]*astromet.T>4)
 
     return results
