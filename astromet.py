@@ -156,9 +156,10 @@ def period(ps):
 # ----------------
 
 
-def XijSimple(ts, ra, dec, t0=0):
+def XijSimple(ts, ra, dec, t0=2016.0):
+    bjd0 = Time(2016.0, format='jyear').jd
     N = ts.size
-    bs = barycentricPosition(ts, bjdStart=epoch)
+    bs = barycentricPosition(ts-t0, bjdStart=bjd0)
     p0 = np.array([-np.sin(ra), np.cos(ra), 0])
     q0 = np.array([-np.cos(ra)*np.sin(dec), -np.sin(ra)*np.sin(dec), np.cos(dec)])
     xij = np.zeros((2*N, 5))
@@ -170,6 +171,39 @@ def XijSimple(ts, ra, dec, t0=0):
     xij[N:, 4] = -np.dot(bs, q0)
     return xij
 
+def design_matrix(t, phi, ra, dec, t0=2016.0):
+    """
+    Iterative optimization to fit astrometric solution in AGIS (outer iteration). Lindegren 2012.
+    Args:
+        - t,       ndarray - Observation times, jyear.
+        - phi,     ndarray - scan angles.
+        - ra, dec  float - reference right ascension and declination of source, deg
+    Returns:
+        - design, ndarry - Design matrix
+    """
+    bjd0 = Time(2016.0, format='jyear').jd
+    ra, dec = np.deg2rad(ra), np.deg2rad(dec)
+    # Barycentric coordinates of Gaia at time t
+    bs = barycentricPosition(t-t0, bjdStart=bjd0)
+    # unit vector in direction of increasing ra - the local west unit vector
+    p0 = np.array([-np.sin(ra), np.cos(ra), 0])
+    # unit vector in direction of increasing dec - the local north unit vector
+    q0 = np.array([-np.cos(ra)*np.sin(dec), -np.sin(ra)*np.sin(dec), np.cos(dec)])
+
+    # sin and cos angles
+    angles = np.deg2rad(phi)
+    sina = np.sin(angles); cosa = np.cos(angles)
+    pifactor = sina*np.dot(p0, bs.T) + cosa*np.dot(q0, bs.T)
+
+    # Construct design matrix
+    design = np.zeros((t.shape[0], 5))
+    design[:,0] = sina
+    design[:,1] = cosa
+    design[:,2] = pifactor
+    design[:,3] = sina*(t-t0)
+    design[:,4] = cosa*(t-t0)
+
+    return design
 
 def barycentricPosition(time, bjdStart=epoch):  # time in years after gaia start (2456863.94 BJD)
     t = time*T + bjdStart
