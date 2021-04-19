@@ -135,7 +135,7 @@ def fit_model(x_obs, x_err, M_matrix, prior=None):
     return r5d_mean, r5d_cov, R, aen, weights
 
 
-def agis(r5d, t, phi, x_err, extra=None, t0=2015.5, G=None):
+def agis(r5d, t, phi, x_err, extra=None, epoch=2016.0, G=None):
     """
     Iterative optimization to fit astrometric solution in AGIS (outer iteration). Lindegren 2012.
     Args:
@@ -167,7 +167,7 @@ def agis(r5d, t, phi, x_err, extra=None, t0=2015.5, G=None):
         results['astrometric_params_solved']=31
 
     # Design matrix
-    design = astromet.design_matrix(t, phi, r5d[0], r5d[1], t0=t0)
+    design = astromet.design_matrix(t, phi, r5d[0], r5d[1], epoch=epoch)
 
     # Transform ra,dec to arcsec
     r5d[:2] = r5d[:2]*(3600*1000)

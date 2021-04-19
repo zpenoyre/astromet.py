@@ -56,29 +56,18 @@ class params():
         self.P = -1
         self.Delta = -1
 
+        # the epoch deetermines when RA and Dec (and other astrometry)
+        # are centred - for dr3 it's 2016.0, dr2 2015.5, dr1 2015.0
+        self.epoch=2016.0
 
-# epoch - zero time of observations in BJD (default is dr3 epoch 2016.0 CE)
-epoch = 2457388.5000000
-# I'm v. open to suggestion about better ways to set epoch!
+def ce_to_bjd(cedate):
+    return 1721057.5 + cedate*T
+def bjd_to_ce(bjddate):
+    return (bjddate - 1721057.5)/T
 
-def setEpoch(newEpoch):
-    global epoch
-    if isinstance(newEpoch, str):
-        if 'dr3' in newEpoch.lower():
-            epoch = 2457388.50
-        if 'dr2' in newEpoch.lower():
-            epoch = 2457206.37
-        if 'dr1' in newEpoch.lower():
-            epoch = 2457023.50
-    elif newEpoch < 10000:  # assume epoch given in years (UT)
-        epoch = 1721057.5 + newEpoch*T
-    else:  # assume epoch given in BJD (UT)
-        epoch = newEpoch
-
-
-def path(ts, ps, comOnly=False, t0=0):
+def path(ts, ps, comOnly=False):
     N = ts.size
-    xij = XijSimple(ts, ps.RA*np.pi/180, ps.Dec*np.pi/180, t0=t0)
+    xij = XijSimple(ts, ps.RA*np.pi/180, ps.Dec*np.pi/180, epoch=ps.epoch)
     r = np.array([0, 0, ps.pmRA, ps.pmDec, ps.pllx])
     pos = xij@r
     ras, decs = ps.RA+mas*pos[:N], ps.Dec+mas*pos[N:]
@@ -93,18 +82,8 @@ def path(ts, ps, comOnly=False, t0=0):
 
     return ras+rls, decs+dls
 
-
-'''def comPath(ts, ps, t0=0):
-    dras, ddecs = comSimple(ts, ps.RA*np.pi/180, ps.Dec*np.pi /
-                            180, ps.pmRA, ps.pmDec, ps.pllx, t0=t0)
-    ras = ps.RA+dras
-    decs = ps.Dec+ddecs
-    return ras, decs'''
-
 # For more details on the fit see section 1 of Hogg, Bovy & Lang 2010
-
-
-def fit(ts, ras, decs, astError=1, t0=0):
+def fit(ts, ras, decs, astError=1):
     # Error precision matrix
     if np.isscalar(astError):  # scalar astrometric error given
         astPrec = np.diag((astError**-2)*np.ones(2*ts.size))
@@ -118,28 +97,12 @@ def fit(ts, ras, decs, astError=1, t0=0):
     diffRa = (ras-medRa)/mas
     diffDec = (decs-medDec)/mas
     # Design matrix
-    xij = XijSimple(ts-t0, medRa*np.pi/180, medDec*np.pi/180)
+    xij = XijSimple(ts, medRa*np.pi/180, medDec*np.pi/180)
     # Astrometry covariance matrix
     cov = np.linalg.inv(xij.T@astPrec@xij)
     params = cov@xij.T@astPrec@np.hstack([diffRa, diffDec])
+    # all parameters in mas(/yr) - ra and dec give displacement *from median*
     return params, cov
-
-
-'''def fit(ts, ras, decs, astError=1, t0=0):
-    medRa = np.median(ras)
-    medDec = np.median(decs)
-    diffRa = (ras-medRa)/mas
-    diffDec = (decs-medDec)/mas
-    xij = XijSimple(ts-t0, medRa*np.pi/180, medDec*np.pi/180)
-    inv = np.linalg.inv(xij.T@xij)
-    params = inv@xij.T@np.hstack([diffRa, diffDec])
-    if np.isscalar(astError): # scalar astrometric error given
-        astError = np.diag(astError*np.ones(2*ts.size))
-    if len(astError.shape)==1: # vector astrometric error given
-        astError = np.diag(astError)
-    paramError = inv@xij.T@(astError**2)@xij@inv
-    return params, paramError'''
-
 
 def uwe(ts, ras, decs, fitParams, astError=1):
     nTs = ts.size
@@ -156,29 +119,35 @@ def uwe(ts, ras, decs, fitParams, astError=1):
 
 def period(ps):
     totalMass = ps.M*(1+ps.q)
-    return np.sqrt(4*(np.pi**2)*(ps.a**3)/(Galt*totalMass))
+    ps.period=np.sqrt(4*(np.pi**2)*(ps.a**3)/(Galt*totalMass))
+    return ps.period
+
+
+def Delta(ps):
+    ps.Delta = np.abs(ps.q-ps.l)/((1+ps.q)*(1+ps.l))
+    return ps.Delta
 
 # ----------------
 # -On-sky motion
 # ----------------
 
 
-def XijSimple(ts, ra, dec, t0=0):
+def XijSimple(ts, ra, dec, epoch=2016.0):
     N = ts.size
-    bs = barycentricPosition(ts-t0, bjdStart=epoch)
+    bs = barycentricPosition(ts)
     p0 = np.array([-np.sin(ra), np.cos(ra), 0])
     q0 = np.array([-np.cos(ra)*np.sin(dec), -np.sin(ra)*np.sin(dec), np.cos(dec)])
     xij = np.zeros((2*N, 5))
     xij[:N, 0] = 1
     xij[N:, 1] = 1
-    xij[:N, 2] = ts-t0
-    xij[N:, 3] = ts-t0
+    xij[:N, 2] = ts-epoch
+    xij[N:, 3] = ts-epoch
     xij[:N, 4] = -(1/np.cos(dec))*np.dot(bs, p0)
     xij[N:, 4] = -np.dot(bs, q0)
     return xij
 
 
-def design_matrix(ts, phi, ra, dec, t0=2016.0):
+def design_matrix(ts, phi, ra, dec, epoch=2016.0):
     """
     Iterative optimization to fit astrometric solution in AGIS (outer iteration)
     Lindegren 2012
@@ -189,10 +158,9 @@ def design_matrix(ts, phi, ra, dec, t0=2016.0):
     Returns:
         - design, ndarry - Design matrix
     """
-    bjd0 = Time(2016.0, format='jyear').jd
     ra, dec = np.deg2rad(ra), np.deg2rad(dec)
     # Barycentric coordinates of Gaia at time t
-    bs = barycentricPosition(ts-t0, bjdStart=bjd0)
+    bs = barycentricPosition(ts)
     # unit vector in direction of increasing ra - the local west unit vector
     p0 = np.array([-np.sin(ra), np.cos(ra), 0])
     # unit vector in direction of increasing dec - the local north unit vector
@@ -209,15 +177,14 @@ def design_matrix(ts, phi, ra, dec, t0=2016.0):
     design[:, 0] = sina
     design[:, 1] = cosa
     design[:, 2] = pifactor
-    design[:, 3] = sina*(ts-t0)
-    design[:, 4] = cosa*(ts-t0)
+    design[:, 3] = sina*(ts-epoch)
+    design[:, 4] = cosa*(ts-epoch)
 
     return design
 
 
-def barycentricPosition(time, bjdStart=epoch):
-    t = time*T + bjdStart
-    pos = astropy.coordinates.get_body_barycentric('earth', astropy.time.Time(t, format='jd'))
+def barycentricPosition(time):
+    pos = astropy.coordinates.get_body_barycentric('earth', astropy.time.Time(time, format='jyear'))
     xs = pos.x.value  # all in AU
     ys = pos.y.value
     zs = pos.z.value
@@ -229,8 +196,8 @@ def barycentricPosition(time, bjdStart=epoch):
 # binary orbit
 
 
-def findEtas(ts, M, a, e, tPeri=0):  # finds an (approximate) eccentric anomaly (see Penoyre & Sandford 2019, appendix A)
-    eta0s = np.sqrt(Galt*M/(a**3))*(ts-tPeri)
+def findEtas(ts, P, e, tPeri=0):  # finds an (approximate) eccentric anomaly (see Penoyre & Sandford 2019, appendix A)
+    eta0s = (2*np.pi/P)*(ts-tPeri)
     eta1s = e*np.sin(eta0s)
     eta2s = (e**2)*np.sin(eta0s)*np.cos(eta0s)
     eta3s = (e**3)*np.sin(eta0s)*(1-(3/2)*np.sin(eta0s)**2)
@@ -248,8 +215,9 @@ def bodyPos(pxs, pys, l, q):  # given the displacements transform to c.o.m. fram
 
 
 def binaryMotion(ts, M, q, l, a, e, vTheta, vPhi, tPeri=0):  # binary position (in projected AU)
-    delta = np.abs(q-l)/((1+q)*(1+l))
-    etas = findEtas(ts, M*(1+q), a, e, tPeri=tPeri)
+    totalMass = M*(1+q)
+    P = np.sqrt(4*(np.pi**2)*(a**3)/(Galt*totalMass))
+    etas = findEtas(ts, P, e, tPeri=tPeri)
     phis = 2*np.arctan(np.sqrt((1+e)/(1-e))*np.tan(etas/2)) % (2*np.pi)
     vPsis = vPhi-phis
     rs = a*(1-e*np.cos(etas))
@@ -267,16 +235,6 @@ def binaryMotion(ts, M, q, l, a, e, vTheta, vPhi, tPeri=0):  # binary position (
 # ----------------------
 # -Analytic solutions (written significantly later - need to go back at some point and double-check for conflicts/ duplications)
 # ----------------------
-def findEta(t, P, e):  # fast approximate solution to t=(P/2pi)*(eta - e*cos(eta))
-    # see Penoyre & Sandford 2019 for more details
-    # (not most accurate or quickest solution to this problem, may replace)
-    eta0 = 2*np.pi*t/P
-    eta1 = e*np.sin(eta0)
-    eta2 = (e**2)*np.sin(eta0)*np.cos(eta0)
-    eta3 = (e**3)*np.sin(eta0)*(1-(3/2)*(np.sin(eta0)**2))
-    return eta0+eta1+eta2+eta3  # accurate up to and including O(e^3)
-
-
 def sigmagamma(eta1, eta2):
     deta = eta2-eta1
     sigma1 = (np.sin(eta2)-np.sin(eta1))/deta
@@ -288,25 +246,14 @@ def sigmagamma(eta1, eta2):
     return sigma1, sigma2, sigma3, gamma1, gamma2, gamma3
 
 
-def findP(ps):
-    totalMass = ps.M*(1+ps.q)
-    ps.P = np.sqrt(4*(np.pi**2)*(ps.a**3)/(Galt*totalMass))
-    return ps.P
-
-
-def findDelta(ps):
-    ps.Delta = np.abs(ps.q-ps.l)/((1+ps.q)*(1+ps.l))
-    return ps.Delta
-
-
 def dThetaEstimate(ps, t1, t2):
     # assuming ~uniform sampling of pos between t1 and t2 can estimate UWE
     if ps.P == -1:
-        P = findP(ps)
+        _ = period(ps)
     if ps.Delta == -1:
-        Delta = findDelta(ps)
-    eta1 = findEta(t1-ps.tPeri, ps.P, ps.e)
-    eta2 = findEta(t2-ps.tPeri, ps.P, ps.e)
+        _ = Delta(ps)
+    eta1 = findEtas(t1, ps.P, ps.e, tPeri=ps.tPeri)
+    eta2 = findEtas(t2, ps.P, ps.e, tPeri=ps.tPeri)
     sigma1, sigma2, sigma3, gamma1, gamma2, gamma3 = sigmagamma(eta1, eta2)
     # print(sigma1,sigma2,sigma3,gamma1,gamma2,gamma3)
     # expected
@@ -330,18 +277,10 @@ def dThetaEstimate(ps, t1, t2):
     epsxsq = nu*(pre**2)*((Omega**4)*epsxsq1
                           + 2*(Omega**2)*Kappa*np.sqrt(1-ps.e**2)*epsxsq2
                           + (Kappa**2)*(1-ps.e**2)*epsxsq3)
-    #print('epsxsq1: ',epsxsq1)
-    #print('epsxsq2: ',epsxsq2)
-    #print('epsxsq3: ',epsxsq3)
 
     epsysq = nu*(pre**2)*(np.cos(ps.vTheta)**2)*(1-ps.e**2) * \
         (0.5 - sigma2/4 - ps.e*(sigma1/4 - sigma3/12))
-    #print('epsx: ',epsx)
-    #print('epsx^2: ',epsx**2)
-    #print('epsy: ',epsy)
-    #print('epsy^2: ',epsy**2)
-    #print('epsxsq: ',epsxsq)
-    #print('epsysq: ',epsysq)
+
     return np.sqrt(epsxsq+epsysq-(epsx**2)-(epsy**2))
 
 # ----------------------
