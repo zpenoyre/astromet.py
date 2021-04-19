@@ -16,7 +16,7 @@ c = 299792458
 # e - eccentricity of Earth's orbit
 e = 0.0167
 # T - year in days
-T = 365.2422
+T = 365.242199
 # year - year in seconds
 year = T*day
 # AU_c - time taken (here given in days) for light to travel from sun to Earth
@@ -51,11 +51,15 @@ class params():
         self.vOmega = 0
         self.tPeri = 0  # years
 
+        # Below are assumed to be derived from other params
+        # (I.e. not(!) specified by user)
+        self.P = -1
+        self.Delta = -1
+
 
 # epoch - zero time of observations in BJD (default is dr3 epoch 2016.0 CE)
 epoch = 2457388.5000000
 # I'm v. open to suggestion about better ways to set epoch!
-
 
 def setEpoch(newEpoch):
     global epoch
@@ -66,7 +70,9 @@ def setEpoch(newEpoch):
             epoch = 2457206.37
         if 'dr1' in newEpoch.lower():
             epoch = 2457023.50
-    else:
+    elif newEpoch < 10000:  # assume epoch given in years (UT)
+        epoch = 1721057.5 + newEpoch*T
+    else:  # assume epoch given in BJD (UT)
         epoch = newEpoch
 
 
@@ -134,18 +140,19 @@ def fit(ts, ras, decs, astError=1, t0=0):
     paramError = inv@xij.T@(astError**2)@xij@inv
     return params, paramError'''
 
-def uwe(ts,ras,decs,fitParams,astError=1):
-    nTs=ts.size
+
+def uwe(ts, ras, decs, fitParams, astError=1):
+    nTs = ts.size
     medRa = np.median(ras)
     medDec = np.median(decs)
     # Design matrix
     xij = XijSimple(ts, medRa*np.pi/180, medDec*np.pi/180)
-    comPath=np.hstack([medRa*np.ones(nTs),medDec*np.ones(nTs)])
 
-    dRas=ras-medRa-mas*(xij@fitParams)[:nTs]
-    dDecs=decs-medDec-mas*(xij@fitParams)[nTs:]
-    diff=np.sqrt(dRas**2 + dDecs**2)
+    dRas = ras-medRa-mas*(xij@fitParams)[:nTs]
+    dDecs = decs-medDec-mas*(xij@fitParams)[nTs:]
+    diff = np.sqrt(dRas**2 + dDecs**2)
     return np.sqrt(np.sum((diff/(mas*astError))**2)/(nTs-5))
+
 
 def period(ps):
     totalMass = ps.M*(1+ps.q)
@@ -156,10 +163,9 @@ def period(ps):
 # ----------------
 
 
-def XijSimple(ts, ra, dec, t0=2016.0):
-    bjd0 = Time(2016.0, format='jyear').jd
+def XijSimple(ts, ra, dec, t0=0):
     N = ts.size
-    bs = barycentricPosition(ts-t0, bjdStart=bjd0)
+    bs = barycentricPosition(ts-t0, bjdStart=epoch)
     p0 = np.array([-np.sin(ra), np.cos(ra), 0])
     q0 = np.array([-np.cos(ra)*np.sin(dec), -np.sin(ra)*np.sin(dec), np.cos(dec)])
     xij = np.zeros((2*N, 5))
@@ -171,9 +177,11 @@ def XijSimple(ts, ra, dec, t0=2016.0):
     xij[N:, 4] = -np.dot(bs, q0)
     return xij
 
-def design_matrix(t, phi, ra, dec, t0=2016.0):
+
+def design_matrix(ts, phi, ra, dec, t0=2016.0):
     """
-    Iterative optimization to fit astrometric solution in AGIS (outer iteration). Lindegren 2012.
+    Iterative optimization to fit astrometric solution in AGIS (outer iteration)
+    Lindegren 2012
     Args:
         - t,       ndarray - Observation times, jyear.
         - phi,     ndarray - scan angles.
@@ -184,7 +192,7 @@ def design_matrix(t, phi, ra, dec, t0=2016.0):
     bjd0 = Time(2016.0, format='jyear').jd
     ra, dec = np.deg2rad(ra), np.deg2rad(dec)
     # Barycentric coordinates of Gaia at time t
-    bs = barycentricPosition(t-t0, bjdStart=bjd0)
+    bs = barycentricPosition(ts-t0, bjdStart=bjd0)
     # unit vector in direction of increasing ra - the local west unit vector
     p0 = np.array([-np.sin(ra), np.cos(ra), 0])
     # unit vector in direction of increasing dec - the local north unit vector
@@ -192,25 +200,27 @@ def design_matrix(t, phi, ra, dec, t0=2016.0):
 
     # sin and cos angles
     angles = np.deg2rad(phi)
-    sina = np.sin(angles); cosa = np.cos(angles)
+    sina = np.sin(angles)
+    cosa = np.cos(angles)
     pifactor = sina*np.dot(p0, bs.T) + cosa*np.dot(q0, bs.T)
 
     # Construct design matrix
-    design = np.zeros((t.shape[0], 5))
-    design[:,0] = sina
-    design[:,1] = cosa
-    design[:,2] = pifactor
-    design[:,3] = sina*(t-t0)
-    design[:,4] = cosa*(t-t0)
+    design = np.zeros((ts.shape[0], 5))
+    design[:, 0] = sina
+    design[:, 1] = cosa
+    design[:, 2] = pifactor
+    design[:, 3] = sina*(ts-t0)
+    design[:, 4] = cosa*(ts-t0)
 
     return design
 
-def barycentricPosition(time, bjdStart=epoch):  # time in years after gaia start (2456863.94 BJD)
+
+def barycentricPosition(time, bjdStart=epoch):
     t = time*T + bjdStart
-    poss = astropy.coordinates.get_body_barycentric('earth', astropy.time.Time(t, format='jd'))
-    xs = poss.x.value  # all in AU
-    ys = poss.y.value
-    zs = poss.z.value
+    pos = astropy.coordinates.get_body_barycentric('earth', astropy.time.Time(t, format='jd'))
+    xs = pos.x.value  # all in AU
+    ys = pos.y.value
+    zs = pos.z.value
     # gaia satellite is at Earth-Sun L2
     l2corr = 1+np.power(3e-6/3, 1/3)  # 3(.003)e-6 is earth/sun mass ratio
     return l2corr*np.vstack([xs, ys, zs]).T
@@ -253,6 +263,86 @@ def binaryMotion(ts, M, q, l, a, e, vTheta, vPhi, tPeri=0):  # binary position (
     # in on-sky coords such that x is projected onto i dirn and y has no i component
     return px1s, py1s, px2s, py2s, pxls, pyls
 
+
+# ----------------------
+# -Analytic solutions (written significantly later - need to go back at some point and double-check for conflicts/ duplications)
+# ----------------------
+def findEta(t, P, e):  # fast approximate solution to t=(P/2pi)*(eta - e*cos(eta))
+    # see Penoyre & Sandford 2019 for more details
+    # (not most accurate or quickest solution to this problem, may replace)
+    eta0 = 2*np.pi*t/P
+    eta1 = e*np.sin(eta0)
+    eta2 = (e**2)*np.sin(eta0)*np.cos(eta0)
+    eta3 = (e**3)*np.sin(eta0)*(1-(3/2)*(np.sin(eta0)**2))
+    return eta0+eta1+eta2+eta3  # accurate up to and including O(e^3)
+
+
+def sigmagamma(eta1, eta2):
+    deta = eta2-eta1
+    sigma1 = (np.sin(eta2)-np.sin(eta1))/deta
+    sigma2 = (np.sin(2*eta2)-np.sin(2*eta1))/deta
+    sigma3 = (np.sin(3*eta2)-np.sin(3*eta1))/deta
+    gamma1 = (np.cos(eta2)-np.cos(eta1))/deta
+    gamma2 = (np.cos(2*eta2)-np.cos(2*eta1))/deta
+    gamma3 = (np.cos(3*eta2)-np.cos(3*eta1))/deta
+    return sigma1, sigma2, sigma3, gamma1, gamma2, gamma3
+
+
+def findP(ps):
+    totalMass = ps.M*(1+ps.q)
+    ps.P = np.sqrt(4*(np.pi**2)*(ps.a**3)/(Galt*totalMass))
+    return ps.P
+
+
+def findDelta(ps):
+    ps.Delta = np.abs(ps.q-ps.l)/((1+ps.q)*(1+ps.l))
+    return ps.Delta
+
+
+def dThetaEstimate(ps, t1, t2):
+    # assuming ~uniform sampling of pos between t1 and t2 can estimate UWE
+    if ps.P == -1:
+        P = findP(ps)
+    if ps.Delta == -1:
+        Delta = findDelta(ps)
+    eta1 = findEta(t1-ps.tPeri, ps.P, ps.e)
+    eta2 = findEta(t2-ps.tPeri, ps.P, ps.e)
+    sigma1, sigma2, sigma3, gamma1, gamma2, gamma3 = sigmagamma(eta1, eta2)
+    # print(sigma1,sigma2,sigma3,gamma1,gamma2,gamma3)
+    # expected
+    nu = 1/(1-ps.e*sigma1)
+    #print('nu: ',nu)
+    Omega = np.sqrt(1-(np.cos(ps.vPhi)**2) * (np.sin(ps.vTheta)**2))
+    Kappa = np.sin(ps.vPhi)*np.cos(ps.vPhi)*(np.sin(ps.vTheta)**2)
+    pre = ps.pllx*ps.Delta*ps.a/Omega
+    #print('pre: ',pre)
+
+    epsx1 = (1+ps.e**2)*sigma1 - ps.e*(1.5 + sigma2/4)
+    epsx2 = gamma1-ps.e*gamma2/4
+    epsx = nu*pre*(epsx1*Omega**2 + Kappa*np.sqrt(1-ps.e**2)*epsx2)
+
+    epsy = -nu*pre*np.cos(ps.vTheta)*np.sqrt(1-ps.e**2)*(gamma1-ps.e*gamma2/4)
+
+    epsxsq1 = (1+2*ps.e**2)*(0.5+sigma2/4)-ps.e*(2+ps.e**2)*sigma1
+    -ps.e*(3*sigma1/4 + sigma3/12)+ps.e**2
+    epsxsq2 = (1+ps.e**2)*(gamma2/4)-ps.e*gamma1-ps.e*(gamma1/4 + gamma3/12)
+    epsxsq3 = 0.5-sigma2/4-ps.e*(sigma1/4 - sigma3/12)
+    epsxsq = nu*(pre**2)*((Omega**4)*epsxsq1
+                          + 2*(Omega**2)*Kappa*np.sqrt(1-ps.e**2)*epsxsq2
+                          + (Kappa**2)*(1-ps.e**2)*epsxsq3)
+    #print('epsxsq1: ',epsxsq1)
+    #print('epsxsq2: ',epsxsq2)
+    #print('epsxsq3: ',epsxsq3)
+
+    epsysq = nu*(pre**2)*(np.cos(ps.vTheta)**2)*(1-ps.e**2) * \
+        (0.5 - sigma2/4 - ps.e*(sigma1/4 - sigma3/12))
+    #print('epsx: ',epsx)
+    #print('epsx^2: ',epsx**2)
+    #print('epsy: ',epsy)
+    #print('epsy^2: ',epsy**2)
+    #print('epsxsq: ',epsxsq)
+    #print('epsysq: ',epsysq)
+    return np.sqrt(epsxsq+epsysq-(epsx**2)-(epsy**2))
 
 # ----------------------
 # -Utilities

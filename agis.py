@@ -18,13 +18,14 @@ def downweight(R, err, aen):
     Args:
         - R, ndarray - residual of observed source position from astrometric solution.
         - err, ndarray - astrometric uncertainty of each observation
-        - aen, ndarray - source astrometric excess noise
+        - aen, ndarray - source astrometric excess noise ?why not scalar?
     Returns:
         - w, ndarray - observation weights
     """
     z = np.sqrt( R**2/(err**2 + aen**2) )
     w = np.where(z<2, 1, 1 - 1.773735*(z-2)**2 + 1.141615*(z-2)**3)
     w = np.where(z<3, w, np.exp(-z/3))
+    # ? w = 0 or 1 only ?
     return w
 
 def en_fit(R, err, w):
@@ -35,7 +36,7 @@ def en_fit(R, err, w):
         - err, ndarray - astrometric uncertainty of each observation
         - w, ndarray - observation weights
     Returns:
-        - aen, ndarry - astrometric_excess_noise
+        - aen, ndarray - astrometric_excess_noise
     """
     y = 0
     nu = np.sum(w>=0.2)-5
