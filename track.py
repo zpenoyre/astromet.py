@@ -257,7 +257,7 @@ def binaryMotion(ts, M, q, l, a, e, vTheta, vPhi, tPeri=0):  # binary position (
     # in on-sky coords such that x is projected onto i dirn and y has no i component
     return px1s, py1s, px2s, py2s, pxls, pyls
 
-def uweObs(ts, racs, decs, r5d, phis=None, astError=1):
+'''def uweObs(ts, racs, decs, r5d, phis=None, astError=1):
     nTs = ts.size
     medDec = mas*np.median(decs) # deg
     medRa = mas*np.median(racs)/np.cos(np.deg2rad(medDec)) # deg
@@ -271,7 +271,7 @@ def uweObs(ts, racs, decs, r5d, phis=None, astError=1):
     dRas = ras-medRa-mas*(xij@fitParams)[:nTs]
     dDecs = decs-medDec-mas*(xij@fitParams)[nTs:]
     diff = np.sqrt(dRas**2 + dDecs**2)
-    return np.sqrt(np.sum((diff/(mas*astError))**2)/(nTs-5))
+    return np.sqrt(np.sum((diff/(mas*astError))**2)/(nTs-5))'''
 
 # ----------------------
 # -Analytic solutions (written significantly later - need to go back at some point and double-check for conflicts/ duplications)

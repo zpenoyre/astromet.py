@@ -97,6 +97,8 @@ def fit_model(x_obs, x_err, M_matrix, prior=None):
     # Initialise - get initial astrometry estimate with weights=1
     aen = 0
     weights = np.ones(len(x_obs))
+    print('weights shape: ',weights.shape)
+    print('x_err shape: ',x_err.shape)
     W = np.eye(len(x_obs))*weights/(x_err**2 + aen)
     r5d_cov = np.linalg.inv(np.matmul(M_matrix.T, np.matmul(W, M_matrix))+prior)
     r5d_mean = np.matmul(r5d_cov, np.matmul(M_matrix.T, np.matmul(W, x_obs)))
@@ -153,6 +155,8 @@ def agis(r5d, t, phi, x_err, extra=None, epoch=2016.0, G=None):
     t = np.repeat(t, 9)
     phi = np.repeat(phi, 9)
     x_err = np.repeat(x_err, 9)
+    print('xerr shape: ',x_err.shape)
+
 
     results['astrometric_n_obs_al']     = len(t)
 
@@ -177,6 +181,7 @@ def agis(r5d, t, phi, x_err, extra=None, epoch=2016.0, G=None):
         x_obs += np.sum(np.vstack((np.sin(np.deg2rad(phi)), np.cos(np.deg2rad(phi))))*extra(t), axis=0)
     # Measurement Error
     x_obs += np.random.normal(0, x_err)
+    print('xobs shape: ',x_obs.shape)
 
     r5d_mean, r5d_cov, R, aen, weights = fit_model(x_obs, x_err, design, prior=prior)
     # Transform ra,dec to degrees
@@ -214,11 +219,12 @@ def gaia_fit(ts, xs, phis, errs, ra, dec, G=12, epoch=2016.0):
     """
 
     results = {}
-    results['astrometric_matched_transits']     = len(t)
-    results['visibility_periods_used'] = np.sum(np.sort(t)[1:]*astromet.T-np.sort(t)[:-1]*astromet.T>4)
+    results['astrometric_matched_transits']     = len(ts)
+    results['visibility_periods_used'] = np.sum(np.sort(ts)[1:]*astromet.T-np.sort(ts)[:-1]*astromet.T>4)
 
     t = np.repeat(ts, 9)
     phi = np.repeat(phis, 9)
+    x = np.repeat(xs, 9)
     x_err = np.repeat(errs, 9)
 
     results['astrometric_n_obs_al']     = len(t)
@@ -232,12 +238,12 @@ def gaia_fit(ts, xs, phis, errs, ra, dec, G=12, epoch=2016.0):
         results['astrometric_params_solved']=31
 
     # Design matrix
-    design = astromet.design_matrix(ts, phis, ra, dec, epoch=epoch)
+    design = astromet.design_matrix(t, phi, ra, dec, epoch=epoch)
 
-    r5d_mean, r5d_cov, R, aen, weights = fit_model(xs, x_err, design, prior=prior)
+    r5d_mean, r5d_cov, R, aen, weights = fit_model(x, x_err, design, prior=prior)
     # Transform ra,dec to degrees
-    dec_mean = r5d_mean[1]*track.mas
-    ra_mean = r5d_mean[0]*track.mas/np.cos(np.deg2rad(dec_mean))
+    dec_mean = r5d_mean[1]*astromet.mas
+    ra_mean = r5d_mean[0]*astromet.mas/np.cos(np.deg2rad(dec_mean))
 
     coords = ['ra', 'dec', 'parallax', 'pmra', 'pmdec']
     for i in range(5):
@@ -251,7 +257,7 @@ def gaia_fit(ts, xs, phis, errs, ra, dec, G=12, epoch=2016.0):
     results['astrometric_excess_noise'] = aen
     results['astrometric_chi2_al']      = np.sum(R**2 / x_err**2)
     results['astrometric_n_good_obs_al']= np.sum(weights>0.2)
-    nparam=results['astrometric_params_solved'].bit_count()
+    nparam=5 #results['astrometric_params_solved'].bit_count()
     results['UWE']= np.sqrt(np.sum(R**2 / x_err**2)/(np.sum(weights>0.2)-nparam))
 
     return results
