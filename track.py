@@ -36,7 +36,7 @@ class params():
         # astrometric parameters
         self.RA = 45  # degree
         self.Dec = 45  # degree
-        self.pmRA = 0  # mas/year
+        self.pmRAc = 0  # mas/year
         self.pmDec = 0  # mas/year
         self.pllx = 1  # mas
         # binary parameters
@@ -55,39 +55,65 @@ class params():
         self.P = -1
         self.Delta = -1
 
-        # the epoch deetermines when RA and Dec (and other astrometry)
+        # the epoch determines when RA and Dec (and other astrometry)
         # are centred - for dr3 it's 2016.0, dr2 2015.5, dr1 2015.0
         self.epoch=2016.0
 
-def ce_to_bjd(cedate):
-    return 1721057.5 + cedate*T
-def bjd_to_ce(bjddate):
+def bjyr_to_bjd(jyrdate):
+    return 1721057.5 + jyrdate*T
+def bjd_to_bjyr(bjddate):
     return (bjddate - 1721057.5)/T
 
+def period(ps):
+    totalMass = ps.M*(1+ps.q)
+    ps.period=np.sqrt(4*(np.pi**2)*(ps.a**3)/(Galt*totalMass))
+    return ps.period
+
+def Delta(ps):
+    ps.Delta = np.abs(ps.q-ps.l)/((1+ps.q)*(1+ps.l))
+    return ps.Delta
+
 def track(ts, ps, comOnly=False, allComponents=False):
+    """
+    Astrometric track in RAcos(Dec) and Dec [mas] for a given binary
+    Args:
+        - ts,       ndarray - Observation times, jyear.
+        - ps,       params object - Astrometric and binary parameters.
+        - comOnly,  bool - If True return only c.o.m track (no binary)
+        - allComponents,     bool - If True return pos. of c.o.l. & both components
+    Returns:
+        - racs      ndarry - RAcosDec at each time, mas
+        - decs      ndarry - Dec at each time, mas
+    """
     N = ts.size
-    xij = XijSimple(ts, ps.RA*np.pi/180, ps.Dec*np.pi/180, epoch=ps.epoch)
-    r = np.array([0, 0, ps.pmRA, ps.pmDec, ps.pllx])
-    pos = xij@r
-    ras, decs = ps.RA+mas*pos[:N], ps.Dec+mas*pos[N:]
+    design_ts=np.hstack([ts,ts])
+    design_phis=np.hstack([90*np.ones_like(ts),np.zeros_like(ts)])
+    xij = design_matrix(design_ts,design_phis,ps.RA,ps.Dec, epoch=ps.epoch)
+
+    RAc0=ps.RA*np.cos(np.deg2rad(ps.RA))/mas # RAcos(Dec) in mas
+    Dec0=ps.Dec/mas # Dec in mas
+
+    r = np.array([RAc0, Dec0, ps.pllx, ps.pmRAc, ps.pmDec])
+    pos = xij@r # all in mas
+    ras, decs = pos[:N], pos[N:]
     if comOnly == True:
         return ras, decs
 
     # extra c.o.l. correction due to binary
     px1s, py1s, px2s, py2s, pxls, pyls = binaryMotion(
         ts-ps.tPeri, ps.M, ps.q, ps.l, ps.a, ps.e, ps.vTheta, ps.vPhi)
-    rls = mas*ps.pllx*(pxls*np.cos(ps.vOmega)+pyls*np.sin(ps.vOmega))
-    dls = mas*ps.pllx*(pyls*np.cos(ps.vOmega)-pxls*np.sin(ps.vOmega))
+    rls = ps.pllx*(pxls*np.cos(ps.vOmega)+pyls*np.sin(ps.vOmega))
+    dls = ps.pllx*(pyls*np.cos(ps.vOmega)-pxls*np.sin(ps.vOmega))
     if allComponents==False:
         return ras+rls, decs+dls # return just the position fo the c.o.l.
     else:
-        r1s = mas*ps.pllx*(px1s*np.cos(ps.vOmega)+py1s*np.sin(ps.vOmega))
-        d1s = mas*ps.pllx*(py1s*np.cos(ps.vOmega)-px1s*np.sin(ps.vOmega))
-        r2s = mas*ps.pllx*(px2s*np.cos(ps.vOmega)+py2s*np.sin(ps.vOmega))
-        d2s = mas*ps.pllx*(py2s*np.cos(ps.vOmega)-px2s*np.sin(ps.vOmega))
+        r1s = ps.pllx*(px1s*np.cos(ps.vOmega)+py1s*np.sin(ps.vOmega))
+        d1s = ps.pllx*(py1s*np.cos(ps.vOmega)-px1s*np.sin(ps.vOmega))
+        r2s = ps.pllx*(px2s*np.cos(ps.vOmega)+py2s*np.sin(ps.vOmega))
+        d2s = ps.pllx*(py2s*np.cos(ps.vOmega)-px2s*np.sin(ps.vOmega))
         return ras+rls, decs+dls, ras+r1s, decs+d1s, ras+r2s, decs+d2s
 
-# For more details on the fit see section 1 of Hogg, Bovy & Lang 2010
+'''# For more details on the fit see section 1 of Hogg, Bovy & Lang 2010
 def fit(ts, ras, decs, astError=1):
     # Error precision matrix
     if np.isscalar(astError):  # scalar astrometric error given
@@ -107,37 +133,30 @@ def fit(ts, ras, decs, astError=1):
     cov = np.linalg.inv(xij.T@astPrec@xij)
     params = cov@xij.T@astPrec@np.hstack([diffRa, diffDec])
     # all parameters in mas(/yr) - ra and dec give displacement *from median*
-    return params, cov
+    return params, cov'''
 
-def uwe(ts, ras, decs, fitParams, astError=1):
-    nTs = ts.size
-    medRa = np.median(ras)
-    medDec = np.median(decs)
-    # Design matrix
-    xij = XijSimple(ts, medRa*np.pi/180, medDec*np.pi/180)
-
-    dRas = ras-medRa-mas*(xij@fitParams)[:nTs]
-    dDecs = decs-medDec-mas*(xij@fitParams)[nTs:]
-    diff = np.sqrt(dRas**2 + dDecs**2)
-    return np.sqrt(np.sum((diff/(mas*astError))**2)/(nTs-5))
-
-
-def period(ps):
-    totalMass = ps.M*(1+ps.q)
-    ps.period=np.sqrt(4*(np.pi**2)*(ps.a**3)/(Galt*totalMass))
-    return ps.period
-
-
-def Delta(ps):
-    ps.Delta = np.abs(ps.q-ps.l)/((1+ps.q)*(1+ps.l))
-    return ps.Delta
+def mock_obs(phis, racs, decs, errs=0):
+    """
+    Converts positions to comparable observables to real astrometric measurements
+    (i.e. 1D psoitions along some scan angle, optionlly with errors added)
+    Args:
+        - ts,       ndarray - Observation times, jyear.
+        - phis,     ndarray - Scanning angles (0 north, 90 east), degrees.
+        - racs,     ndarray - RAcosDec at each scan, mas
+        - decs,     ndarray - Dec at each scan, mas
+        - errs,     float or ndarray - optional normal distributed error to be added
+    Returns:
+        - xs        ndarray - 1D projected displacements
+    """
+    xs=racs*np.sin(phis) + decs*np.cos(phis) + errs*np.random.randn(phis.size)
+    return xs
 
 # ----------------
 # -On-sky motion
 # ----------------
 
 
-def XijSimple(ts, ra, dec, epoch=2016.0):
+'''def XijSimple(ts, ra, dec, epoch=2016.0):
     N = ts.size
     bs = barycentricPosition(ts)
     p0 = np.array([-np.sin(ra), np.cos(ra), 0])
@@ -149,7 +168,7 @@ def XijSimple(ts, ra, dec, epoch=2016.0):
     xij[N:, 3] = ts-epoch
     xij[:N, 4] = -(1/np.cos(dec))*np.dot(bs, p0)
     xij[N:, 4] = -np.dot(bs, q0)
-    return xij
+    return xij'''
 
 
 def design_matrix(ts, phis, ra, dec, epoch=2016.0):
@@ -174,7 +193,7 @@ def design_matrix(ts, phis, ra, dec, epoch=2016.0):
     q0 = np.array([-np.cos(ra)*np.sin(dec), -np.sin(ra)*np.sin(dec), np.cos(dec)])
 
     # sin and cos angles
-    angles = np.deg2rad(phi)
+    angles = np.deg2rad(phis)
     sina = np.sin(angles)
     cosa = np.cos(angles)
     pifactor = sina*np.dot(p0, bs.T) + cosa*np.dot(q0, bs.T)
@@ -238,6 +257,21 @@ def binaryMotion(ts, M, q, l, a, e, vTheta, vPhi, tPeri=0):  # binary position (
     # in on-sky coords such that x is projected onto i dirn and y has no i component
     return px1s, py1s, px2s, py2s, pxls, pyls
 
+def uweObs(ts, racs, decs, r5d, phis=None, astError=1):
+    nTs = ts.size
+    medDec = mas*np.median(decs) # deg
+    medRa = mas*np.median(racs)/np.cos(np.deg2rad(medDec)) # deg
+    # Design matrix
+    design_ts=np.hstack([ts,ts])
+    design_phis=np.hstack([90*np.ones_like(ts),np.zeros_like(ts)])
+    xij = design_matrix(design_ts,design_phis,ps.RA,ps.Dec, epoch=ps.epoch)
+
+    xij = XijSimple(ts, medRa*np.pi/180, medDec*np.pi/180)
+
+    dRas = ras-medRa-mas*(xij@fitParams)[:nTs]
+    dDecs = decs-medDec-mas*(xij@fitParams)[nTs:]
+    diff = np.sqrt(dRas**2 + dDecs**2)
+    return np.sqrt(np.sum((diff/(mas*astError))**2)/(nTs-5))
 
 # ----------------------
 # -Analytic solutions (written significantly later - need to go back at some point and double-check for conflicts/ duplications)
