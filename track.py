@@ -2,7 +2,6 @@ import numpy as np
 import astropy.coordinates
 from astropy import units as u
 from astropy.time import Time
-from astropy.coordinates import get_body_barycentric
 
 # All units SI
 mSun = 2e30
@@ -65,7 +64,7 @@ def ce_to_bjd(cedate):
 def bjd_to_ce(bjddate):
     return (bjddate - 1721057.5)/T
 
-def path(ts, ps, comOnly=False, allComponents=False):
+def track(ts, ps, comOnly=False, allComponents=False):
     N = ts.size
     xij = XijSimple(ts, ps.RA*np.pi/180, ps.Dec*np.pi/180, epoch=ps.epoch)
     r = np.array([0, 0, ps.pmRA, ps.pmDec, ps.pllx])
