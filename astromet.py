@@ -65,7 +65,7 @@ def ce_to_bjd(cedate):
 def bjd_to_ce(bjddate):
     return (bjddate - 1721057.5)/T
 
-def path(ts, ps, comOnly=False):
+def path(ts, ps, comOnly=False, allComponents=False):
     N = ts.size
     xij = XijSimple(ts, ps.RA*np.pi/180, ps.Dec*np.pi/180, epoch=ps.epoch)
     r = np.array([0, 0, ps.pmRA, ps.pmDec, ps.pllx])
@@ -79,8 +79,14 @@ def path(ts, ps, comOnly=False):
         ts-ps.tPeri, ps.M, ps.q, ps.l, ps.a, ps.e, ps.vTheta, ps.vPhi)
     rls = mas*ps.pllx*(pxls*np.cos(ps.vOmega)+pyls*np.sin(ps.vOmega))
     dls = mas*ps.pllx*(pyls*np.cos(ps.vOmega)-pxls*np.sin(ps.vOmega))
-
-    return ras+rls, decs+dls
+    if allComponents==False:
+        return ras+rls, decs+dls # return just the position fo the c.o.l.
+    else:
+        r1s = mas*ps.pllx*(px1s*np.cos(ps.vOmega)+py1s*np.sin(ps.vOmega))
+        d1s = mas*ps.pllx*(py1s*np.cos(ps.vOmega)-px1s*np.sin(ps.vOmega))
+        r2s = mas*ps.pllx*(px2s*np.cos(ps.vOmega)+py2s*np.sin(ps.vOmega))
+        d2s = mas*ps.pllx*(py2s*np.cos(ps.vOmega)-px2s*np.sin(ps.vOmega))
+        return ras+rls, decs+dls, ras+r1s, decs+d1s, ras+r2s, decs+d2s
 
 # For more details on the fit see section 1 of Hogg, Bovy & Lang 2010
 def fit(ts, ras, decs, astError=1):
@@ -147,14 +153,16 @@ def XijSimple(ts, ra, dec, epoch=2016.0):
     return xij
 
 
-def design_matrix(ts, phi, ra, dec, epoch=2016.0):
+def design_matrix(ts, phis, ra, dec, epoch=2016.0):
     """
     Iterative optimization to fit astrometric solution in AGIS (outer iteration)
     Lindegren 2012
+    See Everall+ 2021
     Args:
         - t,       ndarray - Observation times, jyear.
-        - phi,     ndarray - scan angles.
-        - ra, dec  float - reference right ascension and declination of source, deg
+        - phis,     ndarray - scan angles.
+        - ra, dec,  float - reference right ascension and declination of source, deg
+        - epoch     float - time at which position and pm are measured, years CE
     Returns:
         - design, ndarry - Design matrix
     """
