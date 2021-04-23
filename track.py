@@ -113,28 +113,6 @@ def track(ts, ps, comOnly=False, allComponents=False):
         d2s = ps.pllx*(py2s*np.cos(ps.vOmega)-px2s*np.sin(ps.vOmega))
         return ras+rls, decs+dls, ras+r1s, decs+d1s, ras+r2s, decs+d2s
 
-'''# For more details on the fit see section 1 of Hogg, Bovy & Lang 2010
-def fit(ts, ras, decs, astError=1):
-    # Error precision matrix
-    if np.isscalar(astError):  # scalar astrometric error given
-        astPrec = np.diag((astError**-2)*np.ones(2*ts.size))
-    elif len(astError.shape) == 1:  # vector astrometric error given
-        astPrec = np.diag((astError**-2))
-    else:
-        astPrec = astError**-2
-    # convenient to work entirely in mas, relative to median RA and Dec
-    medRa = np.median(ras)
-    medDec = np.median(decs)
-    diffRa = (ras-medRa)/mas
-    diffDec = (decs-medDec)/mas
-    # Design matrix
-    xij = XijSimple(ts, medRa*np.pi/180, medDec*np.pi/180)
-    # Astrometry covariance matrix
-    cov = np.linalg.inv(xij.T@astPrec@xij)
-    params = cov@xij.T@astPrec@np.hstack([diffRa, diffDec])
-    # all parameters in mas(/yr) - ra and dec give displacement *from median*
-    return params, cov'''
-
 def mock_obs(phis, racs, decs, errs=0):
     """
     Converts positions to comparable observables to real astrometric measurements
@@ -148,7 +126,7 @@ def mock_obs(phis, racs, decs, errs=0):
     Returns:
         - xs        ndarray - 1D projected displacements
     """
-    xs=racs*np.sin(phis) + decs*np.cos(phis) + errs*np.random.randn(phis.size)
+    xs=racs*np.sin(np.deg2rad(phis)) + decs*np.cos(np.deg2rad(phis)) + errs*np.random.randn(phis.size)
     return xs
 
 # ----------------
@@ -257,22 +235,6 @@ def binaryMotion(ts, M, q, l, a, e, vTheta, vPhi, tPeri=0):  # binary position (
     # in on-sky coords such that x is projected onto i dirn and y has no i component
     return px1s, py1s, px2s, py2s, pxls, pyls
 
-'''def uweObs(ts, racs, decs, r5d, phis=None, astError=1):
-    nTs = ts.size
-    medDec = mas*np.median(decs) # deg
-    medRa = mas*np.median(racs)/np.cos(np.deg2rad(medDec)) # deg
-    # Design matrix
-    design_ts=np.hstack([ts,ts])
-    design_phis=np.hstack([90*np.ones_like(ts),np.zeros_like(ts)])
-    xij = design_matrix(design_ts,design_phis,ps.RA,ps.Dec, epoch=ps.epoch)
-
-    xij = XijSimple(ts, medRa*np.pi/180, medDec*np.pi/180)
-
-    dRas = ras-medRa-mas*(xij@fitParams)[:nTs]
-    dDecs = decs-medDec-mas*(xij@fitParams)[nTs:]
-    diff = np.sqrt(dRas**2 + dDecs**2)
-    return np.sqrt(np.sum((diff/(mas*astError))**2)/(nTs-5))'''
-
 # ----------------------
 # -Analytic solutions (written significantly later - need to go back at some point and double-check for conflicts/ duplications)
 # ----------------------
@@ -286,8 +248,26 @@ def sigmagamma(eta1, eta2):
     gamma3 = (np.cos(3*eta2)-np.cos(3*eta1))/deta
     return sigma1, sigma2, sigma3, gamma1, gamma2, gamma3
 
+def dtheta_simple(ps):
+    # assuming ~uniform sampling of pos between t1 and t2 can estimate UWE
+    if ps.P == -1:
+        _ = period(ps)
+    if ps.Delta == -1:
+        _ = Delta(ps)
+    Omega = np.sqrt(1-(np.cos(ps.vPhi)**2) * (np.sin(ps.vTheta)**2))
+    Kappa = np.sin(ps.vPhi)*np.cos(ps.vPhi)*(np.sin(ps.vTheta)**2)
+    pre = ps.pllx*ps.Delta*ps.a/Omega
+    #print('pre: ',pre)
 
-def dThetaEstimate(ps, t1, t2):
+    epsx = -pre*(3/2)*ps.e*Omega**2
+    epsy = 0
+
+    epsxsq = (pre**2)*(Omega**4)*(1/2)*(1+2*ps.e**2)
+    epsysq = (pre**2)*(np.cos(ps.vTheta)**2)*(1/2)*(1-ps.e**2)
+
+    return np.sqrt(epsxsq+epsysq-(epsx**2)-(epsy**2))
+
+def dtheta_full(ps, t1, t2):
     # assuming ~uniform sampling of pos between t1 and t2 can estimate UWE
     if ps.P == -1:
         _ = period(ps)
@@ -342,9 +322,7 @@ def sigString(number, significantFigures, extra=False):
     if extra == True:
         return string, roundingFactor
 
-# generating, sampling and fitting a split normal (see https://authorea.com/users/107850/articles/371464-direct-parameter-finding-of-the-split-normal-distribution?commit=ad3d419474f75af951a55c40481506c5a3d1a5e4)
-
-
+# generating, sampling and fitting a split normal (see https://authorea.com/users/107850/articles/371464-direct-parameter-finding-of-the-split-normal-distribution)
 def splitNormal(x, mu, sigma, cigma):
     epsilon = cigma/sigma
     alphas = sigma*np.ones_like(x)
@@ -394,6 +372,43 @@ def splitFit(xs):  # fits a split normal distribution to an array of data
 # ----------------------------------------------
 # - Legacy (old code I'm keeping for reference)
 # ----------------------------------------------
+
+'''def uweObs(ts, racs, decs, r5d, phis=None, astError=1):
+    nTs = ts.size
+    medDec = mas*np.median(decs) # deg
+    medRa = mas*np.median(racs)/np.cos(np.deg2rad(medDec)) # deg
+    # Design matrix
+    design_ts=np.hstack([ts,ts])
+    design_phis=np.hstack([90*np.ones_like(ts),np.zeros_like(ts)])
+    xij = design_matrix(design_ts,design_phis,ps.RA,ps.Dec, epoch=ps.epoch)
+
+    xij = XijSimple(ts, medRa*np.pi/180, medDec*np.pi/180)
+
+    dRas = ras-medRa-mas*(xij@fitParams)[:nTs]
+    dDecs = decs-medDec-mas*(xij@fitParams)[nTs:]
+    diff = np.sqrt(dRas**2 + dDecs**2)
+    return np.sqrt(np.sum((diff/(mas*astError))**2)/(nTs-5))'''
+'''# For more details on the fit see section 1 of Hogg, Bovy & Lang 2010
+def fit(ts, ras, decs, astError=1):
+    # Error precision matrix
+    if np.isscalar(astError):  # scalar astrometric error given
+        astPrec = np.diag((astError**-2)*np.ones(2*ts.size))
+    elif len(astError.shape) == 1:  # vector astrometric error given
+        astPrec = np.diag((astError**-2))
+    else:
+        astPrec = astError**-2
+    # convenient to work entirely in mas, relative to median RA and Dec
+    medRa = np.median(ras)
+    medDec = np.median(decs)
+    diffRa = (ras-medRa)/mas
+    diffDec = (decs-medDec)/mas
+    # Design matrix
+    xij = XijSimple(ts, medRa*np.pi/180, medDec*np.pi/180)
+    # Astrometry covariance matrix
+    cov = np.linalg.inv(xij.T@astPrec@xij)
+    params = cov@xij.T@astPrec@np.hstack([diffRa, diffDec])
+    # all parameters in mas(/yr) - ra and dec give displacement *from median*
+    return params, cov'''
 '''
 # T0 - interval between last periapse before survey (2456662.00 BJD)
 # and start of survey (2456863.94 BJD) in days
