@@ -4,7 +4,7 @@ from astropy import units as u
 from astropy.time import Time
 import matplotlib.pyplot as plt
 
-import astromet.track
+import track
 
 def get_obmt(times):
     return 1717.6256+((np.array(times) + 2455197.5 - 2457023.5 - 0.25)*4)
@@ -150,7 +150,7 @@ def agis(r5d, t, phi, x_err, extra=None, epoch=2016.0, G=None):
 
     results = {}
     results['astrometric_matched_transits']     = len(t)
-    results['visibility_periods_used'] = np.sum(np.sort(t)[1:]*astromet.T-np.sort(t)[:-1]*astromet.T>4)
+    results['visibility_periods_used'] = np.sum(np.sort(t)[1:]*track.T-np.sort(t)[:-1]*track.T>4)
 
     t = np.repeat(t, 9)
     phi = np.repeat(phi, 9)
@@ -168,7 +168,7 @@ def agis(r5d, t, phi, x_err, extra=None, epoch=2016.0, G=None):
         results['astrometric_params_solved']=31
 
     # Design matrix
-    design = astromet.design_matrix(t, phi, r5d[0], r5d[1], epoch=epoch)
+    design = track.design_matrix(t, phi, r5d[0], r5d[1], epoch=epoch)
 
     # Transform ra,dec to milliarcsec
     r5d[:2] = r5d[:2]*(3600*1000)
@@ -220,7 +220,7 @@ def gaia_fit(ts, xs, phis, errs, ra, dec, G=12, epoch=2016.0):
 
     results = {}
     results['astrometric_matched_transits']     = len(ts)
-    results['visibility_periods_used'] = np.sum(np.sort(ts)[1:]*astromet.T-np.sort(ts)[:-1]*astromet.T>4)
+    results['visibility_periods_used'] = np.sum(np.sort(ts)[1:]*track.T-np.sort(ts)[:-1]*track.T>4)
 
     t = np.repeat(ts, 9)
     phi = np.repeat(phis, 9)
@@ -238,12 +238,12 @@ def gaia_fit(ts, xs, phis, errs, ra, dec, G=12, epoch=2016.0):
         results['astrometric_params_solved']=31
 
     # Design matrix
-    design = astromet.design_matrix(t, phi, ra, dec, epoch=epoch)
+    design = track.design_matrix(t, phi, ra, dec, epoch=epoch)
 
     r5d_mean, r5d_cov, R, aen, weights = fit_model(x, x_err, design, prior=prior)
     # Transform ra,dec to degrees
-    r5d_mean[1] = r5d_mean[1]*astromet.mas
-    r5d_mean[0] = r5d_mean[0]*astromet.mas/np.cos(np.deg2rad(r5d_mean[1]))
+    r5d_mean[1] = r5d_mean[1]*track.mas
+    r5d_mean[0] = r5d_mean[0]*track.mas/np.cos(np.deg2rad(r5d_mean[1]))
 
     coords = ['ra', 'dec', 'parallax', 'pmra', 'pmdec']
     for i in range(5):
