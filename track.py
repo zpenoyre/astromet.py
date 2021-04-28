@@ -4,7 +4,7 @@ from astropy import units as u
 from astropy.time import Time
 
 # All units SI
-mSun = 2e30
+mSun = 1.9891e30
 lSun = 3.826e26
 kpc = 3e19
 Gyr = 3.15e16
