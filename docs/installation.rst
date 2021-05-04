@@ -1,0 +1,4 @@
+installation
+============
+
+pip install astromet

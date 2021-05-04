@@ -2,7 +2,6 @@ import numpy as np
 import astropy.coordinates
 from astropy import units as u
 from astropy.time import Time
-import matplotlib.pyplot as plt
 
 import astromet.track
 
