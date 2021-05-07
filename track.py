@@ -2,6 +2,8 @@ import numpy as np
 import astropy.coordinates
 from astropy import units as u
 from astropy.time import Time
+import scipy.interpolate
+import os
 
 # All units SI
 mSun = 1.9891e30
@@ -27,6 +29,14 @@ mas2rad = 4.8481368110954e-9
 # mas - conversion factor which multiplies a value in milli-arcseconds to give degrees
 mas = mas2rad*180/np.pi
 
+# loads data needed to find astrometric error as functon of magnitude
+local_dir = os.path.dirname(__file__) #<-- absolute dir the script is in
+rel_path = 'data/scatteral_edr3.csv'
+abs_file_path = os.path.join(local_dir, rel_path)
+sigma_al_data = np.genfromtxt(abs_file_path,skip_header=1,delimiter=',',unpack=True)
+mags=sigma_al_data[0]
+sigma_als=sigma_al_data[1]
+sigma_ast = scipy.interpolate.interp1d(mags, sigma_als, bounds_error=False)
 
 # ----------------
 # -User functions
@@ -90,7 +100,7 @@ def track(ts, ps, comOnly=False, allComponents=False):
     design_phis=np.hstack([90*np.ones_like(ts),np.zeros_like(ts)])
     xij = design_matrix(design_ts,design_phis,ps.RA,ps.Dec, epoch=ps.epoch)
 
-    RAc0=ps.RA*np.cos(np.deg2rad(ps.RA))/mas # RAcos(Dec) in mas
+    RAc0=ps.RA*np.cos(np.deg2rad(ps.Dec))/mas # RAcos(Dec) in mas
     Dec0=ps.Dec/mas # Dec in mas
 
     r = np.array([RAc0, Dec0, ps.pllx, ps.pmRAc, ps.pmDec])

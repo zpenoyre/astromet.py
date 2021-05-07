@@ -14,5 +14,5 @@ setup(name='astromet',
       url='https://github.com/zpenoyre/astromet.py',
       license='GNU GPLv3',
       packages=['astromet'],
-      install_requires=['numpy','astropy'],
+      install_requires=['numpy','astropy','scipy'],
       )
