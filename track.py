@@ -3,7 +3,7 @@ import astropy.coordinates
 from astropy import units as u
 from astropy.time import Time
 import scipy.interpolate
-import os
+import sys,os
 
 # All units SI
 mSun = 1.9891e30
@@ -31,7 +31,7 @@ mas = mas2rad*180/np.pi
 
 # loads data needed to find astrometric error as functon of magnitude
 local_dir = os.path.dirname(__file__) #<-- absolute dir the script is in
-rel_path = 'data/scatteral_edr3.csv'
+rel_path = '/data/scatteral_edr3.csv'
 abs_file_path = os.path.join(local_dir, rel_path)
 sigma_al_data = np.genfromtxt(abs_file_path,skip_header=1,delimiter=',',unpack=True)
 mags=sigma_al_data[0]
