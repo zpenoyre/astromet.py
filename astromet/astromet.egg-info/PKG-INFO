@@ -1,6 +1,6 @@
-Metadata-Version: 1.0
+Metadata-Version: 2.1
 Name: astromet
-Version: 1.0.12
+Version: 1.0.2
 Summary: One and two body astrometry
 Home-page: https://github.com/zpenoyre/astromet.py
 Author: Zephyr Penoyre

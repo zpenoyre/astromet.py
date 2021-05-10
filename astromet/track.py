@@ -32,7 +32,7 @@ mas = mas2rad*180/np.pi
 # loads data needed to find astrometric error as functon of magnitude
 local_dir = os.path.dirname(__file__) #<-- absolute dir the script is in
 rel_path = '/data/scatteral_edr3.csv'
-abs_file_path = os.path.join(local_dir, rel_path)
+abs_file_path = local_dir+rel_path #os.path.join(local_dir, rel_path)
 sigma_al_data = np.genfromtxt(abs_file_path,skip_header=1,delimiter=',',unpack=True)
 mags=sigma_al_data[0]
 sigma_als=sigma_al_data[1]
