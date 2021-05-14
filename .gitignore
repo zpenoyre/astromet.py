@@ -3,5 +3,7 @@ test.ipynb
 __pycache__
 .DS_Store
 astromet/*.egg-info
+*.egg-info
 dist
 build
+docs/_build/

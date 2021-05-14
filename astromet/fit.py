@@ -240,13 +240,6 @@ def gaia_fit(ts, xs, phis, errs, ra, dec, G=12, epoch=2016.0):
     design = design_matrix(t, phi, ra, dec, epoch=epoch)
 
     r5d_mean, r5d_cov, R, aen, weights = fit_model(x, x_err, design, prior=prior)
-    # Transform ra,dec to degrees
-    r5d_mean[1] = r5d_mean[1]*mas
-    r5d_mean[0] = r5d_mean[0]*mas/np.cos(np.deg2rad(r5d_mean[1]))
-    r5d_cov[0,:] = r5d_cov[0,:]*mas
-    r5d_cov[:,0] = r5d_cov[:,0]*mas
-    r5d_cov[1,:] = r5d_cov[1,:]*mas
-    r5d_cov[:,1] = r5d_cov[:,1]*mas
 
     coords = ['ra', 'dec', 'parallax', 'pmra', 'pmdec']
     for i in range(5):

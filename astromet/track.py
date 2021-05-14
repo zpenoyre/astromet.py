@@ -44,25 +44,27 @@ sigma_ast = scipy.interpolate.interp1d(mags, sigma_als, bounds_error=False)
 class params():
     def __init__(self):
         # astrometric parameters
-        self.RA = 45  # degree
-        self.Dec = 45  # degree
-        self.pmRAc = 0  # mas/year
-        self.pmDec = 0  # mas/year
+        self.ra = 45  # degree
+        self.dec = 45  # degree
+        self.drac = 45  # degree
+        self.ddec = 45  # degree
+        self.pmrac = 0  # mas/year
+        self.pmdec = 0  # mas/year
         self.pllx = 1  # mas
         # binary parameters
-        self.M = 1  # solar mass
+        self.period = 1 # year
         self.a = 1  # AU
         self.e = 0
         self.q = 0
         self.l = 0  # assumed < 1 (though may not matter)
-        self.vTheta = 45
-        self.vPhi = 45
-        self.vOmega = 0
-        self.tPeri = 0  # years
+        self.vtheta = 45
+        self.vphi = 45
+        self.vomega = 0
+        self.tperi = 0  # jyear
 
         # Below are assumed to be derived from other params
         # (I.e. not(!) specified by user)
-        self.P = -1
+        self.totalmass = -1  # solar mass
         self.Delta = -1
 
         # the epoch determines when RA and Dec (and other astrometry)
@@ -74,10 +76,9 @@ def bjyr_to_bjd(jyrdate):
 def bjd_to_bjyr(bjddate):
     return (bjddate - 1721057.5)/T
 
-def period(ps):
-    totalMass = ps.M*(1+ps.q)
-    ps.period=np.sqrt(4*(np.pi**2)*(ps.a**3)/(Galt*totalMass))
-    return ps.period
+def totalmass(ps):
+    ps.totalmass=4*(np.pi**2)*Galt/((ps.period**2)*(ps.a**3))
+    return ps.totalmass
 
 def Delta(ps):
     ps.Delta = np.abs(ps.q-ps.l)/((1+ps.q)*(1+ps.l))
@@ -96,32 +97,28 @@ def track(ts, ps, comOnly=False, allComponents=False):
         - decs      ndarry - Dec at each time, mas
     """
     N = ts.size
-    design_ts=np.hstack([ts,ts])
-    design_phis=np.hstack([90*np.ones_like(ts),np.zeros_like(ts)])
-    xij = design_matrix(design_ts,design_phis,ps.RA,ps.Dec, epoch=ps.epoch)
+    xij = design_simple(ts,ps.ra,ps.dec, epoch=ps.epoch)
 
-    RAc0=ps.RA*np.cos(np.deg2rad(ps.Dec))/mas # RAcos(Dec) in mas
-    Dec0=ps.Dec/mas # Dec in mas
-
-    r = np.array([RAc0, Dec0, ps.pllx, ps.pmRAc, ps.pmDec])
+    r = np.array([ps.drac, ps.ddec, ps.pllx, ps.pmrac, ps.pmdec])
     pos = xij@r # all in mas
-    ras, decs = pos[:N], pos[N:]
+    racs, decs = pos[:N], pos[N:]
     if comOnly == True:
-        return ras, decs
-
+        return racs, decs
+    print(decs.size,' vs ',N)
     # extra c.o.l. correction due to binary
     px1s, py1s, px2s, py2s, pxls, pyls = binaryMotion(
-        ts-ps.tPeri, ps.M, ps.q, ps.l, ps.a, ps.e, ps.vTheta, ps.vPhi)
-    rls = ps.pllx*(pxls*np.cos(ps.vOmega)+pyls*np.sin(ps.vOmega))
-    dls = ps.pllx*(pyls*np.cos(ps.vOmega)-pxls*np.sin(ps.vOmega))
+        ts-ps.tperi, ps.period, ps.q, ps.l, ps.a, ps.e, ps.vtheta, ps.vphi)
+    rls = ps.pllx*(pxls*np.cos(ps.vomega)+pyls*np.sin(ps.vomega))
+    dls = ps.pllx*(pyls*np.cos(ps.vomega)-pxls*np.sin(ps.vomega))
     if allComponents==False:
-        return ras+rls, decs+dls # return just the position fo the c.o.l.
-    else:
-        r1s = ps.pllx*(px1s*np.cos(ps.vOmega)+py1s*np.sin(ps.vOmega))
-        d1s = ps.pllx*(py1s*np.cos(ps.vOmega)-px1s*np.sin(ps.vOmega))
-        r2s = ps.pllx*(px2s*np.cos(ps.vOmega)+py2s*np.sin(ps.vOmega))
-        d2s = ps.pllx*(py2s*np.cos(ps.vOmega)-px2s*np.sin(ps.vOmega))
-        return ras+rls, decs+dls, ras+r1s, decs+d1s, ras+r2s, decs+d2s
+        return racs+rls, decs+dls # return just the position of the c.o.l.
+    else: # returns all 3 components
+        r1s = ps.pllx*(px1s*np.cos(ps.vomega)+py1s*np.sin(ps.vomega))
+        d1s = ps.pllx*(py1s*np.cos(ps.vomega)-px1s*np.sin(ps.vomega))
+        r2s = ps.pllx*(px2s*np.cos(ps.vomega)+py2s*np.sin(ps.vomega))
+        d2s = ps.pllx*(py2s*np.cos(ps.vomega)-px2s*np.sin(ps.vomega))
+        print(decs.size)
+        return racs+rls, decs+dls, racs+r1s, decs+d1s, racs+r2s, decs+d2s
 
 def mock_obs(phis, racs, decs, err=0):
     """
@@ -144,26 +141,24 @@ def mock_obs(phis, racs, decs, err=0):
 # ----------------
 
 
-'''def XijSimple(ts, ra, dec, epoch=2016.0):
+def design_simple(ts, ra, dec, epoch=2016.0):
     N = ts.size
     bs = barycentricPosition(ts)
     p0 = np.array([-np.sin(ra), np.cos(ra), 0])
     q0 = np.array([-np.cos(ra)*np.sin(dec), -np.sin(ra)*np.sin(dec), np.cos(dec)])
-    xij = np.zeros((2*N, 5))
-    xij[:N, 0] = 1
-    xij[N:, 1] = 1
-    xij[:N, 2] = ts-epoch
-    xij[N:, 3] = ts-epoch
-    xij[:N, 4] = -(1/np.cos(dec))*np.dot(bs, p0)
-    xij[N:, 4] = -np.dot(bs, q0)
-    return xij'''
+    design = np.zeros((2*N, 5))
+    design[:N, 0] = 1
+    design[N:, 1] = 1
+    design[:N, 2] = ts-epoch
+    design[N:, 3] = ts-epoch
+    design[:N, 4] = -(1/np.cos(dec))*np.dot(bs, p0)
+    design[N:, 4] = -np.dot(bs, q0)
+    return design
 
 
 def design_matrix(ts, phis, ra, dec, epoch=2016.0):
     """
-    Iterative optimization to fit astrometric solution in AGIS (outer iteration)
-    Lindegren 2012
-    See Everall+ 2021
+    There was a description of this function - but I deleted it
     Args:
         - t,       ndarray - Observation times, jyear.
         - phis,     ndarray - scan angles.
@@ -228,9 +223,7 @@ def bodyPos(pxs, pys, l, q):  # given the displacements transform to c.o.m. fram
     return px1s, py1s, px2s, py2s, pxls, pyls
 
 
-def binaryMotion(ts, M, q, l, a, e, vTheta, vPhi, tPeri=0):  # binary position (in projected AU)
-    totalMass = M*(1+q)
-    P = np.sqrt(4*(np.pi**2)*(a**3)/(Galt*totalMass))
+def binaryMotion(ts, P, q, l, a, e, vTheta, vPhi, tPeri=0):  # binary position (in projected AU)
     etas = findEtas(ts, P, e, tPeri=tPeri)
     phis = 2*np.arctan(np.sqrt((1+e)/(1-e))*np.tan(etas/2)) % (2*np.pi)
     vPsis = vPhi-phis
@@ -246,7 +239,7 @@ def binaryMotion(ts, M, q, l, a, e, vTheta, vPhi, tPeri=0):  # binary position (
     return px1s, py1s, px2s, py2s, pxls, pyls
 
 # ----------------------
-# -Analytic solutions (written significantly later - need to go back at some point and double-check for conflicts/ duplications)
+# -Analytic solutions
 # ----------------------
 def sigmagamma(eta1, eta2):
     deta = eta2-eta1
@@ -260,12 +253,10 @@ def sigmagamma(eta1, eta2):
 
 def dtheta_simple(ps):
     # assuming ~uniform sampling of pos between t1 and t2 can estimate UWE
-    if ps.P == -1:
-        _ = period(ps)
     if ps.Delta == -1:
         _ = Delta(ps)
-    Omega = np.sqrt(1-(np.cos(ps.vPhi)**2) * (np.sin(ps.vTheta)**2))
-    Kappa = np.sin(ps.vPhi)*np.cos(ps.vPhi)*(np.sin(ps.vTheta)**2)
+    Omega = np.sqrt(1-(np.cos(ps.vphi)**2) * (np.sin(ps.vtheta)**2))
+    Kappa = np.sin(ps.vphi)*np.cos(ps.vphi)*(np.sin(ps.vtheta)**2)
     pre = ps.pllx*ps.Delta*ps.a/Omega
     #print('pre: ',pre)
 
@@ -273,25 +264,23 @@ def dtheta_simple(ps):
     epsy = 0
 
     epsxsq = (pre**2)*(Omega**4)*(1/2)*(1+2*ps.e**2)
-    epsysq = (pre**2)*(np.cos(ps.vTheta)**2)*(1/2)*(1-ps.e**2)
+    epsysq = (pre**2)*(np.cos(ps.vtheta)**2)*(1/2)*(1-ps.e**2)
 
     return np.sqrt(epsxsq+epsysq-(epsx**2)-(epsy**2))
 
 def dtheta_full(ps, t1, t2):
     # assuming ~uniform sampling of pos between t1 and t2 can estimate UWE
-    if ps.P == -1:
-        _ = period(ps)
     if ps.Delta == -1:
         _ = Delta(ps)
-    eta1 = findEtas(t1, ps.P, ps.e, tPeri=ps.tPeri)
-    eta2 = findEtas(t2, ps.P, ps.e, tPeri=ps.tPeri)
+    eta1 = findEtas(t1, ps.period, ps.e, tPeri=ps.tperi)
+    eta2 = findEtas(t2, ps.period, ps.e, tPeri=ps.tperi)
     sigma1, sigma2, sigma3, gamma1, gamma2, gamma3 = sigmagamma(eta1, eta2)
     # print(sigma1,sigma2,sigma3,gamma1,gamma2,gamma3)
     # expected
     nu = 1/(1-ps.e*sigma1)
     #print('nu: ',nu)
-    Omega = np.sqrt(1-(np.cos(ps.vPhi)**2) * (np.sin(ps.vTheta)**2))
-    Kappa = np.sin(ps.vPhi)*np.cos(ps.vPhi)*(np.sin(ps.vTheta)**2)
+    Omega = np.sqrt(1-(np.cos(ps.vphi)**2) * (np.sin(ps.vtheta)**2))
+    Kappa = np.sin(ps.vphi)*np.cos(ps.vphi)*(np.sin(ps.vtheta)**2)
     pre = ps.pllx*ps.Delta*ps.a/Omega
     #print('pre: ',pre)
 
@@ -299,7 +288,7 @@ def dtheta_full(ps, t1, t2):
     epsx2 = gamma1-ps.e*gamma2/4
     epsx = nu*pre*(epsx1*Omega**2 + Kappa*np.sqrt(1-ps.e**2)*epsx2)
 
-    epsy = -nu*pre*np.cos(ps.vTheta)*np.sqrt(1-ps.e**2)*(gamma1-ps.e*gamma2/4)
+    epsy = -nu*pre*np.cos(ps.vtheta)*np.sqrt(1-ps.e**2)*(gamma1-ps.e*gamma2/4)
 
     epsxsq1 = (1+2*ps.e**2)*(0.5+sigma2/4)-ps.e*(2+ps.e**2)*sigma1
     -ps.e*(3*sigma1/4 + sigma3/12)+ps.e**2
@@ -309,7 +298,7 @@ def dtheta_full(ps, t1, t2):
                           + 2*(Omega**2)*Kappa*np.sqrt(1-ps.e**2)*epsxsq2
                           + (Kappa**2)*(1-ps.e**2)*epsxsq3)
 
-    epsysq = nu*(pre**2)*(np.cos(ps.vTheta)**2)*(1-ps.e**2) * \
+    epsysq = nu*(pre**2)*(np.cos(ps.vtheta)**2)*(1-ps.e**2) * \
         (0.5 - sigma2/4 - ps.e*(sigma1/4 - sigma3/12))
 
     return np.sqrt(epsxsq+epsysq-(epsx**2)-(epsy**2))
