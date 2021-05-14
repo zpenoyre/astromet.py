@@ -1,24 +1,24 @@
-# astrometpy
+# astromet.py
 
 A simple python package for generating astrometric tracks of single stars and the center of light of binary systems.
 
-Most of the functionality is mapped out in the exaple.ipynb notebook.
+https://astrometpy.readthedocs.io/en/latest/
+
+**pip install astromet**
+
+Still in development, functional but may occasional bugs or future changes. Get in touch with issues/suggestions.
 
 Requires:
 numpy
 astropy
+scipy
 matplotlib (for notebook)
 
-To do:
-Pip package
-More explicit choice of epoch
-1D scans
-
-Suggestions welcome
 
 
 # AGIS emulator
 ---------------
+*a brief summary of one specific part of the package, mostly refering to rpevious generations of the code and definitely not a guide on how to use it! (rasing the question of why it's still here)*
 
 We've included code to predict outputs from the _Gaia_ pipeline given the source position on the sky.
 This combines astrometpy with [scanninglaw](https://github.com/gaiaverse/scanninglaw).

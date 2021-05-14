@@ -2,3 +2,6 @@ test.ipynb
 .ipynb_checkpoints
 __pycache__
 .DS_Store
+astromet/*.egg-info
+dist
+build
