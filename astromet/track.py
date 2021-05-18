@@ -104,7 +104,6 @@ def track(ts, ps, comOnly=False, allComponents=False):
     racs, decs = pos[:N], pos[N:]
     if comOnly == True:
         return racs, decs
-    print(decs.size,' vs ',N)
     # extra c.o.l. correction due to binary
     px1s, py1s, px2s, py2s, pxls, pyls = binaryMotion(
         ts-ps.tperi, ps.period, ps.q, ps.l, ps.a, ps.e, ps.vtheta, ps.vphi)
