@@ -95,6 +95,7 @@ Let's compare the one-body motion with this binary system
     plt.show()
 
 giving
+
 .. image:: plots/twoBody.png
   :width: 400
   :alt: binary astrometric track
