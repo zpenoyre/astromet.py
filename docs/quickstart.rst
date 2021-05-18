@@ -8,7 +8,7 @@ Let's start with a simple single body example:
     import astromet
     import numpy as np
 
-    # an object wich holds all the necessary parameters to generate the astrometric track
+    # an object which holds all the necessary parameters to generate a track
     params=astromet.params()
 
     # center of mass parameters
@@ -31,7 +31,7 @@ drac and ddec keeping track of the offset between our approximate RA and Dec and
 All we need now is some times at which we want to find the position
 ::
 
-    # random times between 2014 and 2018 - a very rough approximation to Gaia eDR3
+    # random times between 2014 and 2018
     ts=2014 + 4*np.random.rand(100)
 
 and we can find the track
@@ -49,7 +49,7 @@ and plot it
     ax.set_ylabel(r'$Dec$ [mas]')
     plt.show()
 
-.. image:: plots/singleBody.pdf
+.. image:: plots/singleBody.png
   :width: 400
   :alt: single body astrometric track
 
@@ -95,6 +95,6 @@ Let's compare the one-body motion with this binary system
     plt.show()
 
 giving
-.. image:: plots/twoBody.pdf
+.. image:: plots/twoBody.png
   :width: 400
   :alt: binary astrometric track
