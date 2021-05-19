@@ -134,7 +134,111 @@ def fit_model(x_obs, x_err, M_matrix, prior=None):
     return r5d_mean, r5d_cov, R, aen, weights
 
 
-def agis(r5d, t, phi, x_err, extra=None, epoch=2016.0, G=None):
+def gaia_fit(ts, xs, phis, errs, ra, dec, G=12, epoch=2016.0):
+    """
+    Iterative optimization to fit astrometric solution in AGIS (outer iteration).
+    Lindegren 2012.
+    Args:
+        - ts,          ndarray - source observation times, jyear
+        - xs,          ndarray - source 1d positions, mas
+        - phis,        ndarray - source observation scan angles, deg
+        - errs,        ndarray - scan measurement error, mas
+        - ra,          float - RA for design_matrix, deg
+        - dec,         float - Dec for design_matrix, deg
+        - G,           float - Apparent magnitude, 2 parameter prior only, mag
+        - epoch        float - Epoch at which results are calculated, jyear
+            Returns:
+        - results      dict - output data Gaia would produce
+    """
+
+    results = {}
+    results['astrometric_matched_transits']     = len(ts)
+    results['visibility_periods_used'] = np.sum(np.sort(ts)[1:]*T-np.sort(ts)[:-1]*T>4)
+
+    t = np.repeat(ts, 9)
+    phi = np.repeat(phis, 9)
+    x = np.repeat(xs, 9)
+    x_err = np.repeat(errs, 9)
+
+    results['astrometric_n_obs_al']     = len(t)
+
+    # Add prior on components if fewer that 6 visibility periods
+    if results['visibility_periods_used']<6:
+        prior = agis_2d_prior(ra, dec, G)
+        results['astrometric_params_solved']=3
+    else:
+        prior = np.zeros((5,5))
+        results['astrometric_params_solved']=31
+
+    # Design matrix
+    design = design_matrix(t, phi, ra, dec, epoch=epoch)
+
+    r5d_mean, r5d_cov, R, aen, weights = fit_model(x, x_err, design, prior=prior)
+
+    coords = ['drac', 'ddec', 'parallax', 'pmrac', 'pmdec']
+    for i in range(5):
+        results[coords[i]] = r5d_mean[i]
+        results[coords[i]+'_error'] = np.sqrt(r5d_cov[i,i])
+        for j in range(i):
+            results[coords[j]+'_'+coords[i]+'_corr']=\
+                r5d_cov[i,j]/np.sqrt(r5d_cov[i,i]*r5d_cov[j,j])
+
+    results['astrometric_excess_noise'] = aen
+    results['astrometric_chi2_al']      = np.sum(R**2 / x_err**2)
+    results['astrometric_n_good_obs_al']= np.sum(weights>0.2)
+    nparam=5 #results['astrometric_params_solved'].bit_count()
+    results['UWE']= np.sqrt(np.sum(R**2 / x_err**2)/(np.sum(weights>0.2)-nparam))
+
+    return results
+
+def simple_fit(ts, racs, decs, errs, ra, dec, G=12, epoch=2016.0):
+    """
+    Fitting 2D positions to a 5 parameter astrometric model
+    See Penoyre et al. 2020 for details
+    Args:
+        - ts,          ndarray - source observation times, jyear
+        - racs,        ndarray - RA cos(Dec) positions, mas
+        - decs,        ndarray - Dec positions, mas
+        - errs,        ndarray - scan measurement error, mas
+        - ra,          float - RA for design_matrix, deg
+        - dec,         float - Dec for design_matrix, deg
+        - G,           float - Apparent magnitude, 2 parameter prior only, mag
+        - epoch        float - Epoch at which results are calculated, jyear
+            Returns:
+        - results      dict - output data
+    """
+
+    results = {}
+    results['astrometric_matched_transits']     = len(ts)
+    results['visibility_periods_used'] = np.sum(np.sort(ts)[1:]*T-np.sort(ts)[:-1]*T>4)
+
+    results['astrometric_n_obs_al'] = 2*len(ts)
+
+    results['astrometric_params_solved']=31
+
+    # Design matrix
+    design = design_simple(ts, ra, dec, epoch=epoch)
+    pos=np.hstack([racs,decs])
+
+    xtxinv=np.linalg.inv(np.matmul(design.T,design))
+    fitparams=np.matmul(np.matmul(xtxinv,design.T),pos)
+    uwe=np.linalg.norm(pos-np.matmul(design,fitparams))/(errs*np.sqrt(2*len(ts)-5))
+    fitcov=(errs**2)*(uwe**2)*xtxinv
+
+    coords = ['drac', 'ddec', 'parallax', 'pmrac', 'pmdec']
+    for i in range(5):
+        results[coords[i]] = fitparams[i]
+        results[coords[i]+'_error'] = np.sqrt(fitcov[i,i])
+        for j in range(i):
+            results[coords[j]+'_'+coords[i]+'_corr']=\
+                fitcov[i,j]/np.sqrt(fitcov[i,i]*fitcov[j,j])
+
+    results['UWE']= uwe
+
+    return results
+
+# keeping below for reference, effectively same as gaia_fit() but with slightly different use case
+'''def agis(r5d, t, phi, x_err, extra=None, epoch=2016.0, G=None):
     """
     Iterative optimization to fit astrometric solution in AGIS (outer iteration). Lindegren 2012.
     Args:
@@ -198,62 +302,4 @@ def agis(r5d, t, phi, x_err, extra=None, epoch=2016.0, G=None):
     nparam=5 #results['astrometric_params_solved'].bit_count()
     results['UWE']= np.sqrt(np.sum(R**2 / x_err**2)/(np.sum(weights>0.2)-nparam))
 
-    return results
-
-def gaia_fit(ts, xs, phis, errs, ra, dec, G=12, epoch=2016.0):
-    """
-    Iterative optimization to fit astrometric solution in AGIS (outer iteration).
-    Lindegren 2012.
-    Args:
-        - ts,          ndarray - source observation times, jyear
-        - xs,          ndarray - source 1d positions, mas
-        - phis,        ndarray - source observation scan angles, deg
-        - errs,        ndarray - scan measurement error, mas
-        - ra,          float - RA for design_matrix, deg
-        - dec,         float - Dec for design_matrix, deg
-        - G,           float - Apparent magnitude, 2 parameter prior only, mag
-        - epoch        float - Epoch at which results are calculated, jyear
-            Returns:
-        - results      dict - output data Gaia would produce
-    """
-
-    results = {}
-    results['astrometric_matched_transits']     = len(ts)
-    results['visibility_periods_used'] = np.sum(np.sort(ts)[1:]*T-np.sort(ts)[:-1]*T>4)
-
-    t = np.repeat(ts, 9)
-    phi = np.repeat(phis, 9)
-    x = np.repeat(xs, 9)
-    x_err = np.repeat(errs, 9)
-
-    results['astrometric_n_obs_al']     = len(t)
-
-    # Add prior on components if fewer that 6 visibility periods
-    if results['visibility_periods_used']<6:
-        prior = agis_2d_prior(ra, dec, G)
-        results['astrometric_params_solved']=3
-    else:
-        prior = np.zeros((5,5))
-        results['astrometric_params_solved']=31
-
-    # Design matrix
-    design = design_matrix(t, phi, ra, dec, epoch=epoch)
-
-    r5d_mean, r5d_cov, R, aen, weights = fit_model(x, x_err, design, prior=prior)
-
-    coords = ['ra', 'dec', 'parallax', 'pmra', 'pmdec']
-    for i in range(5):
-        results[coords[i]] = r5d_mean[i]
-        # WARNING - all RA and Dec terms have wrong units, to fix!
-        results[coords[i]+'_error'] = np.sqrt(r5d_cov[i,i])
-        for j in range(i):
-            results[coords[j]+'_'+coords[i]+'_corr']=\
-                r5d_cov[i,j]/np.sqrt(r5d_cov[i,i]*r5d_cov[j,j])
-
-    results['astrometric_excess_noise'] = aen
-    results['astrometric_chi2_al']      = np.sum(R**2 / x_err**2)
-    results['astrometric_n_good_obs_al']= np.sum(weights>0.2)
-    nparam=5 #results['astrometric_params_solved'].bit_count()
-    results['UWE']= np.sqrt(np.sum(R**2 / x_err**2)/(np.sum(weights>0.2)-nparam))
-
-    return results
+    return results'''
