@@ -1,6 +1,6 @@
 quickstart
 ==========
-Single body
+single body
 -----------
 Let's start with a simple single body example:
 ::
@@ -53,7 +53,7 @@ and plot it
   :width: 400
   :alt: single body astrometric track
 
-Binary system
+binary system
 -------------
 
 A binary system behaves in exactly the same way, just with a few extra parameters
@@ -81,7 +81,8 @@ we've actually been working with a binary system the whole time, but the default
 q=l(=0), meaning the centre of light sits atop the centre of mass always and we don't see
 any excess motion.
 
-Let's compare the one-body motion with this binary system
+Let's compare the one-body motion with this binary system (we'll add a b to the names
+of all variables involving the binary)
 
 ::
 
@@ -100,7 +101,7 @@ giving
   :width: 400
   :alt: binary astrometric track
 
-A simple fit
+a simple fit
 ------------
 
 Astromet.py is a package in two halves. The first we've already seen, simulating an astrometric track
@@ -165,9 +166,9 @@ giving
    'parallax_pmdec_corr': -0.15455398491840128,
    'pmra_pmdec_corr': 0.08027280929072023,
    'UWE': 1.0040287275558353}
-Let's unpick a few of these values. We observe at 100 times (astrometric_matched_transits)
-and in two directions, RA and Dec, giving 200 observations (astrometric_n_obs_al).
-Only 74 (visibility_periods_used) of our observations are spaced by more than 4 days.
+Let's unpick a few of these values. We observe at 100 times ('astrometric_matched_transits')
+and in two directions, RA and Dec, giving 200 observations ('astrometric_n_obs_al').
+Only 74 ('visibility_periods_used') of our observations are spaced by more than 4 days.
 Using the parallax as our example we have: parallax=4.999733625222756 +- 0.025740848099767042
 ('parallax'+-'parallax_error'), which as we should expect is consistent with the true value
 we chose for this system. Finally we have an Unit Weight Error ('UWE' - effectively the
@@ -222,7 +223,7 @@ to see how good both fits are:
     fitparams=astromet.params()
     bfitparams=astromet.params()
     for i in range(32):
-    print(i)
+
     fitparams.ra=160     #[deg]
     fitparams.dec=-50    #[deg]
     fitparams.drac=results['drac']+results['drac_error']*np.random.randn()     #[mas]
@@ -264,7 +265,7 @@ in-depth replice of Gaia's own astrometric fitting function in gaia_fit().
 
 We'll save that discussion for another page (coming soon, but all working in code!).
 
-Postscript - epoch
+postscript - epoch
 -----------------
 
 One final detail We left out here is the ability to set an epoch - the
