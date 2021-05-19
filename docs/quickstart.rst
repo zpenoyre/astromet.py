@@ -22,8 +22,11 @@ Let's start with a simple single body example:
 
 You may notice that we've defined 7 parameters, even though for a single star we
 expect a 5 parameter solution. The reason for this is twofold:
+
 - position is measured as a local deviation in milli-arcseconds [mas], instead of globally in degrees
+
 - rather than using RA as a coordinate we can use RA*cos(Dec) locally (often shortened in the code to rac)
+
 We need to define the RA and Dec approximately, as this sets the orientation of
 the parallax ellipse, but then all local motion is described in (rac,dec), with
 drac and ddec keeping track of the offset between our approximate RA and Dec and the actual position of the star.
@@ -128,7 +131,6 @@ First let's add some random error to both tracks:
     ax.scatter(bobsracs,bobsdecs)
     ax.set_xlabel(r'$RA \cos(Dec)$ [mas]')
     ax.set_ylabel(r'$Dec$ [mas]')
-    plt.savefig('docs/plots/twoBodyError.png')
     plt.show()
 
 .. image:: plots/twoBodyError.png
@@ -138,6 +140,7 @@ First let's add some random error to both tracks:
 Then we can fit a single body model (remember we still have to supply approximate
  RA and Dec for the parallax ellipse)
 ::
+
     results = astromet.simple_fit(ts,obsracs,obsdecs,ast_error,params.ra,params.dec)
 giving
 ::
