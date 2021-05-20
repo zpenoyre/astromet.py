@@ -151,6 +151,9 @@ def gaia_fit(ts, xs, phis, errs, ra, dec, G=12, epoch=2016.0):
         - results      dict - output data Gaia would produce
     """
 
+    if np.size(errs)==1:
+        errs=errs*np.ones_like(ts)
+
     results = {}
     results['astrometric_matched_transits']     = len(ts)
     results['visibility_periods_used'] = np.sum(np.sort(ts)[1:]*T-np.sort(ts)[:-1]*T>4)
