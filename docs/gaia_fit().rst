@@ -116,7 +116,7 @@ we can even use appropriate Gaia-like astrometric error!
 
 which gives the true c.o.l. track in black, and the 1D observations in orange
 
-.. image:: plots/twoBodyScanning.png
+.. image:: plots/twoBodyScans.png
   :width: 400
   :alt: two body orbit scanned at particular angles
 
