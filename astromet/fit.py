@@ -134,7 +134,7 @@ def fit_model(x_obs, x_err, M_matrix, prior=None):
     return r5d_mean, r5d_cov, R, aen, weights
 
 
-def gaia_fit(ts, xs, phis, errs, ra, dec, G=12, epoch=2016.0):
+def gaia_fit(ts, xs, phis, xerr, ra, dec, G=12, epoch=2016.0):
     """
     Iterative optimization to fit astrometric solution in AGIS (outer iteration).
     Lindegren 2012.
@@ -143,27 +143,28 @@ def gaia_fit(ts, xs, phis, errs, ra, dec, G=12, epoch=2016.0):
         - xs,          ndarray - source 1d positions, mas
         - phis,        ndarray - source observation scan angles, deg
         - errs,        ndarray - scan measurement error, mas
-        - ra,          float - RA for design_matrix, deg
-        - dec,         float - Dec for design_matrix, deg
+        - ra,          float - RA for design_1d, deg
+        - dec,         float - Dec for design_1d, deg
         - G,           float - Apparent magnitude, 2 parameter prior only, mag
         - epoch        float - Epoch at which results are calculated, jyear
             Returns:
         - results      dict - output data Gaia would produce
     """
 
-    if np.size(errs)==1:
-        errs=errs*np.ones_like(ts)
+    if np.size(xerr)==1:
+        xerr=xerr*np.ones_like(ts)
 
     results = {}
     results['astrometric_matched_transits']     = len(ts)
     results['visibility_periods_used'] = np.sum(np.sort(ts)[1:]*T-np.sort(ts)[:-1]*T>4)
 
-    t = np.repeat(ts, 9)
-    phi = np.repeat(phis, 9)
-    x = np.repeat(xs, 9)
-    x_err = np.repeat(errs, 9)
+    t_ccd = np.repeat(ts, 9)
+    phi_ccd = np.repeat(phis, 9)
+    x_ccd = np.repeat(xs, 9)
+    xerr_ccd = np.repeat(xerr, 9)
+    xobs_ccd = np.random.normal(x_ccd, xerr_ccd)
 
-    results['astrometric_n_obs_al']     = len(t)
+    results['astrometric_n_obs_al']     = len(t_ccd)
 
     # Add prior on components if fewer that 6 visibility periods
     if results['visibility_periods_used']<6:
@@ -174,11 +175,17 @@ def gaia_fit(ts, xs, phis, errs, ra, dec, G=12, epoch=2016.0):
         results['astrometric_params_solved']=31
 
     # Design matrix
-    design = design_matrix(t, phi, ra, dec, epoch=epoch)
+    #design = design_1d(t, phi, ra, dec, epoch=epoch)
+    design = design_matrix(t_ccd,np.deg2rad(ra),np.deg2rad(dec),phis=phi_ccd,epoch=epoch,project_al=True)
 
-    r5d_mean, r5d_cov, R, aen, weights = fit_model(x, x_err, design, prior=prior)
 
-    coords = ['drac', 'ddec', 'parallax', 'pmrac', 'pmdec']
+    r5d_mean, r5d_cov, R, aen, weights = fit_model(xobs_ccd, xerr_ccd, design, prior=prior)
+    # convert mas to degrees
+    r5d_mean[:2]/=(3600*1000)
+    # racosdec to ra
+    r5d_mean[0]/=np.cos(np.deg2rad(r5d_mean[1]))
+
+    coords = ['ra', 'dec', 'parallax', 'pmra', 'pmdec']
     for i in range(5):
         results[coords[i]] = r5d_mean[i]
         results[coords[i]+'_error'] = np.sqrt(r5d_cov[i,i])
@@ -187,10 +194,10 @@ def gaia_fit(ts, xs, phis, errs, ra, dec, G=12, epoch=2016.0):
                 r5d_cov[i,j]/np.sqrt(r5d_cov[i,i]*r5d_cov[j,j])
 
     results['astrometric_excess_noise'] = aen
-    results['astrometric_chi2_al']      = np.sum(R**2 / x_err**2)
+    results['astrometric_chi2_al']      = np.sum(R**2 / xerr_ccd**2)
     results['astrometric_n_good_obs_al']= np.sum(weights>0.2)
     nparam=5 #results['astrometric_params_solved'].bit_count()
-    results['UWE']= np.sqrt(np.sum(R**2 / x_err**2)/(np.sum(weights>0.2)-nparam))
+    results['UWE']= np.sqrt(np.sum(R**2 / xerr_ccd**2)/(np.sum(weights>0.2)-nparam))
 
     return results
 
@@ -203,8 +210,8 @@ def simple_fit(ts, racs, decs, errs, ra, dec, G=12, epoch=2016.0):
         - racs,        ndarray - RA cos(Dec) positions, mas
         - decs,        ndarray - Dec positions, mas
         - errs,        ndarray - scan measurement error, mas
-        - ra,          float - RA for design_matrix, deg
-        - dec,         float - Dec for design_matrix, deg
+        - ra,          float - RA for design_1d, deg
+        - dec,         float - Dec for design_1d, deg
         - G,           float - Apparent magnitude, 2 parameter prior only, mag
         - epoch        float - Epoch at which results are calculated, jyear
             Returns:
@@ -240,8 +247,10 @@ def simple_fit(ts, racs, decs, errs, ra, dec, G=12, epoch=2016.0):
 
     return results
 
-# keeping below for reference, effectively same as gaia_fit() but with slightly different use case
-'''def agis(r5d, t, phi, x_err, extra=None, epoch=2016.0, G=None):
+
+
+# keeping below for reference, effectively same as gaia_fit() but with slightly different use case/input
+def agis(r5d, t, phi, x_err, extra=None, epoch=2016.0, G=None):
     """
     Iterative optimization to fit astrometric solution in AGIS (outer iteration). Lindegren 2012.
     Args:
@@ -274,7 +283,7 @@ def simple_fit(ts, racs, decs, errs, ra, dec, G=12, epoch=2016.0):
         results['astrometric_params_solved']=31
 
     # Design matrix
-    design = design_matrix(t, phi, r5d[0], r5d[1], epoch=epoch)
+    design = design_1d(t, phi, r5d[0], r5d[1], epoch=epoch)
 
     # Transform ra,dec to milliarcsec
     r5d[:2] = r5d[:2]*(3600*1000)
@@ -305,4 +314,4 @@ def simple_fit(ts, racs, decs, errs, ra, dec, G=12, epoch=2016.0):
     nparam=5 #results['astrometric_params_solved'].bit_count()
     results['UWE']= np.sqrt(np.sum(R**2 / x_err**2)/(np.sum(weights>0.2)-nparam))
 
-    return results'''
+    return results
