@@ -1,33 +1,26 @@
 import numpy as np
 import astropy.coordinates
 from astropy import units as u
+from astropy import constants
 from astropy.time import Time
 import scipy.interpolate
 import sys,os
 
-# All units SI
-mSun = 1.9891e30
-lSun = 3.826e26
-kpc = 3e19
-Gyr = 3.15e16
-day = 24*(60**2)
-G = 6.67e-11
-AU = 1.496e+11
-c = 299792458
-# e - eccentricity of Earth's orbit
-e = 0.0167
-# T - year in days
-T = 365.242199
-# year - year in seconds
-year = T*day
-# AU_c - time taken (here given in days) for light to travel from sun to Earth
-AU_c = AU/(c*day)
-# G in units of AU, years and solar masses
-Galt = G * AU**-3 * mSun**1 * year**2
-# mas2rad - conversion factor which multiplies a value in milli-arcseconds to give radians
-mas2rad = 4.8481368110954e-9
-# mas - conversion factor which multiplies a value in milli-arcseconds to give degrees
-mas = mas2rad*180/np.pi
+# Create units used elsewhere
+mSun = constants.M_sun.to(u.kg).value
+lSun = constants.L_sun.to(u.W).value
+kpc = constants.kpc.to(u.m).value
+Gyr = (1.0*u.Gyr).to(u.s).value
+day = (1.0*u.day).to(u.s).value
+G = constants.G.to(u.m**3/u.kg/u.s**2).value
+AU = (1.0*u.AU).to(u.m).value
+c = constants.c.to(u.m/u.s).value
+T = (1.0*u.year).to(u.day).value
+year = (1.0*u.year).to(u.s).value
+AU_c = (1.0*u.AU/constants.c).to(u.day).value
+Galt = constants.G.to(u.AU**3/u.M_sun/u.year**2).value
+mas2rad = (1.0*u.mas).to(u.rad).value
+mas = (1.0*u.mas).to(u.deg).value
 
 # loads data needed to find astrometric error as functon of magnitude
 local_dir = os.path.dirname(__file__) #<-- absolute dir the script is in
@@ -228,12 +221,145 @@ def barycentricPosition(time):
 # binary orbit
 
 
-def findEtas(ts, P, e, tPeri=0):  # finds an (approximate) eccentric anomaly (see Penoyre & Sandford 2019, appendix A)
-    eta0s = (2*np.pi/P)*(ts-tPeri)
-    eta1s = e*np.sin(eta0s)
-    eta2s = (e**2)*np.sin(eta0s)*np.cos(eta0s)
-    eta3s = (e**3)*np.sin(eta0s)*(1-(3/2)*np.sin(eta0s)**2)
+def conditional_njit(backup = None):
+    def decorator(func):
+        try:
+            from numba import njit
+            return njit(func)
+        except ImportError:
+            if backup == None:
+                return func
+            else:
+                return backup
+    return decorator
+
+def findEtas_backup(ts, period, eccentricity, tPeri=0, N_it = None):  # finds an (approximate) eccentric anomaly (see Penoyre & Sandford 2019, appendix A)
+    eta0s =  ((2*np.pi/period)*(ts-tPeri)) % (2.0*np.pi) # (2*np.pi/period)*(ts-tPeri)
+    eta1s = eccentricity*np.sin(eta0s)
+    eta2s = (eccentricity**2)*np.sin(eta0s)*np.cos(eta0s)
+    eta3s = (eccentricity**3)*np.sin(eta0s)*(1-(3/2)*np.sin(eta0s)**2)
     return eta0s+eta1s+eta2s+eta3s
+
+@conditional_njit(findEtas_backup)
+def findEtas(ts, period, eccentricity, tPeri=0, N_it = 10):
+    """Solve Kepler's equation, E - e sin E = ell, via the contour integration method of Philcox et al. (2021)
+    This uses techniques described in Ullisch (2020) to solve the `geometric goat problem'.
+    Args:
+        ts (np.ndarray): Times.
+        period (float): Period of orbit.
+        eccentricity (float): Eccentricity. Must be in the range 0<e<1.
+        tPeri (float): Pericentre time.
+        N_it (float): Number of grid-points.
+    Returns:
+        np.ndarray: Array of eccentric anomalies, E.
+        
+    Slightly edited version of code taken from https://github.com/oliverphilcox/Keplers-Goat-Herd
+    """
+    
+    ell_array = ((2*np.pi/period)*(ts-tPeri)) % (2.0*np.pi)
+    
+    # Check inputs
+    if eccentricity<=0.:
+        raise Exception("Eccentricity must be greater than zero!")
+    elif eccentricity>=1:
+        raise Exception("Eccentricity must be less than unity!")
+    if np.max(ell_array)>2.*np.pi:
+        raise Exception("Mean anomaly should be in the range (0, 2 pi)")
+    if np.min(ell_array)<0:
+        raise Exception("Mean anomaly should be in the range (0, 2 pi)")
+    if N_it<2:
+        raise Exception("Need at least two sampling points!")
+
+    # Define sampling points
+    N_points = N_it - 2
+    N_fft = (N_it-1)*2
+
+    # Define contour radius
+    radius = eccentricity/2
+
+    # Generate e^{ikx} sampling points and precompute real and imaginary parts
+    j_arr = np.arange(N_points)
+    freq = (2*np.pi*(j_arr+1.)/N_fft).reshape((-1, 1))#[:,np.newaxis]
+    exp2R = np.cos(freq)
+    exp2I = np.sin(freq)
+    ecosR= eccentricity*np.cos(radius*exp2R)
+    esinR = eccentricity*np.sin(radius*exp2R)
+    exp4R = exp2R*exp2R-exp2I*exp2I
+    exp4I = 2.*exp2R*exp2I
+    coshI = np.cosh(radius*exp2I)
+    sinhI = np.sinh(radius*exp2I)
+
+    # Precompute e sin(e/2) and e cos(e/2)
+    esinRadius = eccentricity*np.sin(radius);
+    ecosRadius = eccentricity*np.cos(radius);
+
+    # Define contour center for each ell and precompute sin(center), cos(center)
+    filt = ell_array<np.pi
+    center = ell_array-eccentricity/2.
+    center[filt] += eccentricity
+    sinC = np.sin(center)
+    cosC = np.cos(center)
+    output = center
+
+    ## Accumulate Fourier coefficients
+    # NB: we halve the integration range by symmetry, absorbing factor of 2 into ratio
+
+    ## Separate out j = 0 piece, which is simpler
+
+    # Compute z in real and imaginary parts (zI = 0 here)
+    zR = center + radius
+
+    # Compute e*sin(zR) from precomputed quantities
+    tmpsin = sinC*ecosRadius+cosC*esinRadius
+
+    # Compute f(z(x)) in real and imaginary parts (fxI = 0)
+    fxR = zR - tmpsin - ell_array
+
+     # Add to arrays, with factor of 1/2 since an edge
+    ft_gx2 = 0.5/fxR
+    ft_gx1 = 0.5/fxR
+
+    ## Compute j = 1 to N_points pieces
+
+    # Compute z in real and imaginary parts
+    zR = center + radius*exp2R
+    zI = radius*exp2I
+
+    # Compute f(z(x)) in real and imaginary parts
+    # can use precomputed cosh / sinh / cos / sin for this!
+    tmpsin = sinC*ecosR+cosC*esinR # e sin(zR)
+    tmpcos = cosC*ecosR-sinC*esinR # e cos(zR)
+
+    fxR = zR - tmpsin*coshI-ell_array
+    fxI = zI - tmpcos*sinhI
+
+    # Compute 1/f(z) and append to array
+    ftmp = fxR*fxR+fxI*fxI;
+    fxR /= ftmp;
+    fxI /= ftmp;
+
+    ft_gx2 += np.sum(exp4R*fxR+exp4I*fxI,axis=0)
+    ft_gx1 += np.sum(exp2R*fxR+exp2I*fxI,axis=0)
+
+    ## Separate out j = N_it piece, which is simpler
+
+    # Compute z in real and imaginary parts (zI = 0 here)
+    zR = center - radius
+
+    # Compute sin(zR) from precomputed quantities
+    tmpsin = sinC*ecosRadius-cosC*esinRadius
+
+    # Compute f(z(x)) in real and imaginary parts (fxI = 0 here)
+    fxR = zR - tmpsin-ell_array
+
+    # Add to sum, with 1/2 factor for edges
+    ft_gx2 += 0.5/fxR;
+    ft_gx1 += -0.5/fxR;
+
+    ### Compute and return the solution E(ell,e)
+    output += radius*ft_gx2/ft_gx1;
+
+    return output
 
 
 def bodyPos(pxs, pys, l, q):  # given the displacements transform to c.o.m. frame
