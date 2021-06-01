@@ -1,33 +1,26 @@
 import numpy as np
 import astropy.coordinates
 from astropy import units as u
+from astropy import constants
 from astropy.time import Time
 import scipy.interpolate
 import sys,os
 
-# All units SI
-mSun = 1.9891e30
-lSun = 3.826e26
-kpc = 3e19
-Gyr = 3.15e16
-day = 24*(60**2)
-G = 6.67e-11
-AU = 1.496e+11
-c = 299792458
-# e - eccentricity of Earth's orbit
-e = 0.0167
-# T - year in days
-T = 365.242199
-# year - year in seconds
-year = T*day
-# AU_c - time taken (here given in days) for light to travel from sun to Earth
-AU_c = AU/(c*day)
-# G in units of AU, years and solar masses
-Galt = G * AU**-3 * mSun**1 * year**2
-# mas2rad - conversion factor which multiplies a value in milli-arcseconds to give radians
-mas2rad = 4.8481368110954e-9
-# mas - conversion factor which multiplies a value in milli-arcseconds to give degrees
-mas = mas2rad*180/np.pi
+# Create units used elsewhere
+mSun = constants.M_sun.to(u.kg).value
+lSun = constants.L_sun.to(u.W).value
+kpc = constants.kpc.to(u.m).value
+Gyr = (1.0*u.Gyr).to(u.s).value
+day = (1.0*u.day).to(u.s).value
+G = constants.G.to(u.m**3/u.kg/u.s**2).value
+AU = (1.0*u.AU).to(u.m).value
+c = constants.c.to(u.m/u.s).value
+T = (1.0*u.year).to(u.day).value
+year = (1.0*u.year).to(u.s).value
+AU_c = (1.0*u.AU/constants.c).to(u.day).value
+Galt = constants.G.to(u.AU**3/u.M_sun/u.year**2).value
+mas2rad = (1.0*u.mas).to(u.rad).value
+mas = (1.0*u.mas).to(u.deg).value
 
 # loads data needed to find astrometric error as functon of magnitude
 local_dir = os.path.dirname(__file__) #<-- absolute dir the script is in
