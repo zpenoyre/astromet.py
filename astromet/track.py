@@ -47,7 +47,7 @@ class params():
         # binary parameters
         self.period = 1 # year
         self.a = 0  # AU
-        self.e = 0
+        self.e = 0.1
         self.q = 0
         self.l = 0  # assumed < 1 (though may not matter)
         self.vtheta = 45
@@ -252,12 +252,12 @@ def findEtas(ts, period, eccentricity, tPeri=0, N_it = 10):
         N_it (float): Number of grid-points.
     Returns:
         np.ndarray: Array of eccentric anomalies, E.
-        
+
     Slightly edited version of code taken from https://github.com/oliverphilcox/Keplers-Goat-Herd
     """
-    
+
     ell_array = ((2*np.pi/period)*(ts-tPeri)) % (2.0*np.pi)
-    
+
     # Check inputs
     if eccentricity<=0.:
         raise Exception("Eccentricity must be greater than zero!")
