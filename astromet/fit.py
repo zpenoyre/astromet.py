@@ -140,7 +140,7 @@ def gaia_fit(ts, xs, phis, xerr, ra, dec, G=12, epoch=2016.0):
     Lindegren 2012.
     Args:
         - ts,          ndarray - source observation times, jyear
-        - xs,          ndarray - source 1d positions, mas
+        - xs,          ndarray - source 1d positions relative to ra,dec , mas
         - phis,        ndarray - source observation scan angles, deg
         - errs,        ndarray - scan measurement error, mas
         - ra,          float - RA for design_1d, deg
@@ -184,6 +184,9 @@ def gaia_fit(ts, xs, phis, xerr, ra, dec, G=12, epoch=2016.0):
     r5d_mean[:2]/=(3600*1000)
     # racosdec to ra
     r5d_mean[0]/=np.cos(np.deg2rad(r5d_mean[1]))
+    # Add back in ra and dec to return to reference position
+    r5d_mean[0] += ra
+    r5d_mean[1] += dec
 
     coords = ['ra', 'dec', 'parallax', 'pmra', 'pmdec']
     for i in range(5):
