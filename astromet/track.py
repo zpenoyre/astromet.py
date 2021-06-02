@@ -90,28 +90,29 @@ def track(ts, ps, comOnly=False, allComponents=False):
         - decs      ndarry - Dec at each time, mas
     """
     xij = design_matrix(ts, np.deg2rad(ps.rac/np.cos(np.deg2rad(ps.dec))), np.deg2rad(ps.dec), epoch=ps.epoch)
+    xij[:2,:,:2] = 0.
 
     cosdec = np.cos(np.deg2rad(ps.dec))
     # ra*cos(dec), dec, parallax, pmra*cos(dec), pmdec
     r5d = np.array([ps.rac/mas, ps.dec/mas, ps.parallax, ps.pmrac, ps.pmdec])
-    racs, decs = xij@r5d # all in mas
+    dracs, ddecs = xij@r5d # all in mas
 
     if comOnly == True:
-        return racs, decs
+        return dracs, ddecs
     # extra c.o.l. correction due to binary
     px1s, py1s, px2s, py2s, pxls, pyls = binaryMotion(
         ts-ps.tperi, ps.period, ps.q, ps.l, ps.a, ps.e, ps.vtheta, ps.vphi)
     rls = ps.parallax*(pxls*np.cos(ps.vomega)+pyls*np.sin(ps.vomega))
     dls = ps.parallax*(pyls*np.cos(ps.vomega)-pxls*np.sin(ps.vomega))
     if allComponents==False:
-        return racs+rls, decs+dls # return just the position of the c.o.l.
+        return dracs+rls, ddecs+dls # return just the position of the c.o.l.
     else: # returns all 3 components
         r1s = ps.parallax*(px1s*np.cos(ps.vomega)+py1s*np.sin(ps.vomega))
         d1s = ps.parallax*(py1s*np.cos(ps.vomega)-px1s*np.sin(ps.vomega))
         r2s = ps.parallax*(px2s*np.cos(ps.vomega)+py2s*np.sin(ps.vomega))
         d2s = ps.parallax*(py2s*np.cos(ps.vomega)-px2s*np.sin(ps.vomega))
         print(decs.size)
-        return racs+rls, decs+dls, racs+r1s, decs+d1s, racs+r2s, decs+d2s
+        return dracs+rls, ddecs+dls, dracs+r1s, ddecs+d1s, dracs+r2s, ddecs+d2s
 
 def mock_obs(phis, racs, decs, err=0):
     """
