@@ -1,4 +1,4 @@
-gaia_fit()
+fit()
 ==========
 
 In the quickstart we've shown how to generate a 2D astrometric track (in RA cos(Dec) and Dec)
@@ -68,7 +68,7 @@ Let's generate a fresh astrometric track (see the quickstart for more details)
     params.ddec=0
     params.pmrac=8
     params.pmdec=-2
-    params.pllx=5
+    params.parallax=5
 
     params.period=2
     params.a=2
@@ -97,38 +97,42 @@ we can even use appropriate Gaia-like astrometric error!
     al_error=astromet.sigma_ast(mag) # about 1.1 mas at this magnitude
     errs=al_error*np.random.randn(phis.size)
 
-    radphis=np.deg2rad(phis)
+    t_obs,x_obs,phi_obs,rac_obs,dec_obs=astromet.mock_obs(ts,phis,racs,decs,err=x_err)
+    radphis=np.deg2rad(phi_obs)
 
-    obsracs=racs+errs*np.sin(radphis)
-    obsdecs=decs+errs*np.cos(radphis)
-
-    plotts=np.linspace(np.min(ts),np.max(ts),1000)
+    plotts=np.linspace(np.min(t_obs),np.max(t_obs),1000)
     plotracs,plotdecs=astromet.track(plotts,params)
 
     ax=plt.gca()
-    for i in range(ts.size):
-        ax.plot([obsracs-al_error*np.sin(radphis),obsracs+al_error*np.sin(radphis)],
-                [obsdecs-al_error*np.cos(radphis),obsdecs+al_error*np.cos(radphis)],c='b')
+    for i in range(t_obs.size):
+        ax.plot([rac_obs-al_error*np.sin(radphis),rac_obs+al_error*np.sin(radphis)],
+                [dec_obs-al_error*np.cos(radphis),dec_obs+al_error*np.cos(radphis)],c='b')
     ax.plot(plotracs,plotdecs,c='k')
     ax.set_xlabel(r'$RA \cos(Dec)$ [mas]')
     ax.set_ylabel(r'$Dec$ [mas]')
     plt.show()
 
-which gives the true c.o.l. track in black, and the 1D observations in orange
+which gives the true c.o.l. track in black, and the 1D observations in orange.
+
 
 .. image:: plots/twoBodyScans.png
   :width: 400
   :alt: two body orbit scanned at particular angles
 
-we can now fit our 1D positions (along the scanning line) by projecting the rac
-and dec along the scan directions
+There's quite a lot going on in mock_obs() so let's examine the outputs a little
+more closely - to replicate gaia it creates 9 observations for each observation period
+(corresponding to Gaia's 9 rows of CCDs), generates a random error for each and applies
+this to the rac and dec measurements, then projects the whole thing along the scan angles
+to give the xs.
 
+If we don't want 9 scans we can use the optional argument nmeasure. For example,
+setting nmeasure=1 will just apply random errors to the positions we've already generated
+and project along scan directions.
+
+Let's look at the projected positions over time
 ::
-
-    xs=obsracs*np.sin(radphis) + obsdecs*np.cos(radphis)
-
     ax=plt.gca()
-    ax.errorbar(ts,xs,yerr=al_error,fmt='x')
+    ax.errorbar(t_obs,x_obs,yerr=al_error,fmt='x')
     ax.set_xlabel(r'observation time')
     ax.set_ylabel(r'$x_i = \alpha^*_i\ \sin(\phi) + \delta_i\ \cos(\phi)$')
     plt.show()
@@ -145,43 +149,21 @@ fitting
 We've done all the hard work so now let's actually fit the system
 ::
 
-    bresults=astromet.gaia_fit(ts,xs,phis,al_error,ra,dec)
+    bresults=astromet.fit(t_obs,x_obs,phi_obs,al_error,ra,dec)
 
-giving
+this will give a similar set of results to simple_fit() from the quickstart,
+but using a close emulation of the full Gaia astrometric pipeline
+'AGIS <https://ui.adsabs.harvard.edu/abs/2012A%26A...538A..78L/abstract>'_.
+
+In short this pipeline iteratively performs fits, inflating (if needed) an extra
+error term (the 'excess_noise') until the residuals between the observations and best
+fitting single-body model are consistent with this enlarged error.
+
+Finally we might want an *exact* analog to the Gaia results, so we can transform
+the output from fit() into the specific astrometric fields in the Gaia data model
+using
 ::
 
-    {'astrometric_matched_transits': 53,
-    'visibility_periods_used': 27,
-    'astrometric_n_obs_al': 477,
-    'astrometric_params_solved': 31,
-    'drac': -2.481421682613298,
-    'drac_error': 0.10330412078579548,
-    'ddec': -2.0822725280167207,
-    'ddec_error': 0.11616733166796216,
-    'drac_ddec_corr': 0.24939965421383536,
-    'parallax': 0.9112533540683432,
-    'parallax_error': 0.13907356133507548,
-    'drac_parallax_corr': 0.08235084909701362,
-    'ddec_parallax_corr': -0.02169689621021175,
-    'pmrac': 4.545562076801453,
-    'pmrac_error': 0.13649396642644182,
-    'drac_pmrac_corr': -0.19745338313101343,
-    'ddec_pmrac_corr': 0.0018445384883175732,
-    'parallax_pmrac_corr': -0.21826409282824877,
-    'pmdec': 7.545692663911277,
-    'pmdec_error': 0.15000644543322567,
-    'drac_pmdec_corr': -0.0095170601930002,
-    'ddec_pmdec_corr': -0.27082042039288146,
-    'parallax_pmdec_corr': -0.03590654299703582,
-    'pmrac_pmdec_corr': 0.22016438959432935,
-    'astrometric_excess_noise': 1.0664866591921252,
-    'astrometric_chi2_al': 1184.8841763027692,
-    'astrometric_n_good_obs_al': 477,
-    'UWE': 1.5844077225101925}
+    gaia_results=astromet.gaia_results(bresults)
 
 .. _scanning-law: https://github.com/gaiaverse/scanninglaw
-
-
-
-
-https://ui.adsabs.harvard.edu/abs/2012A%26A...538A..78L/abstract

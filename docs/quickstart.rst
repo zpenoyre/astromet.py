@@ -17,9 +17,13 @@ We generally record the position of astronomical objects in a spherical
  euclidean system, and Gaia returns position as RA [deg] but error as the uncertainty
  in RA cos(Dec) [mas].
 
- We'll try to replicate Gaia's conventions (even when it means parameters are just misnamed)
- and to be clear wherever this might cause confusion.
+Rather than work in global coordinates (in degrees) we'll work in some local
+displacement relative to some initial approximate RA and Dec - these are needed
+to define the parallax ellipse but only need be accurate to arcsecond level.
 
+The actual tracks and fitting are expressed in local delta RA cos(Dec) and delta Dec
+(drac and ddec for short) in milli-arcseconds - which is a much more appropriate
+unit for the motion of stars.
 
 single body
 -----------
@@ -35,20 +39,11 @@ Let's start with a simple single body example:
     # center of mass parameters
     params.ra=160     #[deg]
     params.dec=-50    #[deg]
+    params.drac=0     #[mas]
+    params.ddec=0     #[mas]
     params.pmrac=8    #[mas/yr]
     params.pmdec=-2   #[mas/yr]
-    params.pllx=5     #[mas]
-
-You may notice that we've defined 7 parameters, even though for a single star we
-expect a 5 parameter solution. The reason for this is twofold:
-
-- position is measured as a local deviation in milli-arcseconds [mas], instead of globally in degrees
-
-- rather than using RA as a coordinate we can use RA*cos(Dec) locally (often shortened in the code to rac)
-
-We need to define the RA and Dec approximately, as this sets the orientation of
-the parallax ellipse, but then all local motion is described in (rac,dec), with
-drac and ddec keeping track of the offset between our approximate RA and Dec and the actual position of the star.
+    params.parallax=5     #[mas]
 
 All we need now is some times at which we want to find the position
 ::
@@ -126,7 +121,7 @@ giving
 a simple fit
 ------------
 
-Astromet.py is a package in two halves. The first we've already seen, simulating an astrometric track
+astromet.py is a package in two halves. The first we've already seen, simulating an astrometric track
 for a known system. The second, related but independent, is for fitting an astrometric model to
 an an astrometric track.
 
@@ -163,10 +158,8 @@ Then we can fit a single body model (remember we still have to supply approximat
     results = astromet.simple_fit(ts,obsracs,obsdecs,ast_error,params.ra,params.dec)
 giving
 ::
-   {'astrometric_matched_transits': 100,
-   'visibility_periods_used': 74,
-   'astrometric_n_obs_al': 200,
-   'astrometric_params_solved': 31,
+   {'vis_periods': 74,
+   'n_obs': 100,
    'drac': -0.009982054996942186,
    'drac_error': 0.030180777265569076,
    'ddec': -0.013148563085311177,
@@ -188,9 +181,8 @@ giving
    'parallax_pmdec_corr': -0.15455398491840128,
    'pmra_pmdec_corr': 0.08027280929072023,
    'UWE': 1.0040287275558353}
-Let's unpick a few of these values. We observe at 100 times ('astrometric_matched_transits')
-and in two directions, RA and Dec, giving 200 observations ('astrometric_n_obs_al').
-Only 74 ('visibility_periods_used') of our observations are spaced by more than 4 days.
+Let's unpick a few of these values. We observe at 100 times ('n_obs').
+Only 74 ('vis_periods') of our observations are spaced by more than 4 days.
 Using the parallax as our example we have: parallax=4.999733625222756 +- 0.025740848099767042
 ('parallax'+-'parallax_error'), which as we should expect is consistent with the true value
 we chose for this system. Finally we have an Unit Weight Error ('UWE' - effectively the
@@ -203,10 +195,8 @@ We can do the same for the binary system
 giving
 ::
 
-    {'astrometric_matched_transits': 100,
-    'visibility_periods_used': 74,
-    'astrometric_n_obs_al': 200,
-    'astrometric_params_solved': 31,
+    {'vis_periods': 74,
+    'n_obs': 100,
     'drac': -2.251177716178904,
     'drac_error': 0.1289215261663215,
     'ddec': -1.840590304658127,
@@ -283,9 +273,9 @@ And there we go, we've fit (well) a single star and (poorly) a binary star
 astrometric track. The last remaining piece is to make our observations more
 realistic - with particular scan directions and greater precision in the
 along scan direction compared to across scan - and to use the similar but more
-in-depth replice of Gaia's own astrometric fitting function in gaia_fit().
+in-depth replice of Gaia's own astrometric fitting function in fit().
 
-We'll save that discussion for another page (coming soon, but all working in code!).
+We'll save that discussion for another page.
 
 postscript - epoch
 -----------------
