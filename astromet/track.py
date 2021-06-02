@@ -89,11 +89,11 @@ def track(ts, ps, comOnly=False, allComponents=False):
         - racs      ndarry - RAcosDec at each time, mas
         - decs      ndarry - Dec at each time, mas
     """
-    xij = design_matrix(ts, np.deg2rad(ps.ra), np.deg2rad(ps.dec), epoch=ps.epoch)
+    xij = design_matrix(ts, np.deg2rad(ps.rac/np.cos(np.deg2rad(ps.dec))), np.deg2rad(ps.dec), epoch=ps.epoch)
 
     cosdec = np.cos(np.deg2rad(ps.dec))
     # ra*cos(dec), dec, parallax, pmra*cos(dec), pmdec
-    r5d = np.array([ps.ra*cosdec/mas, ps.dec/mas, ps.parallax, ps.pmra*cosdec, ps.pmdec])
+    r5d = np.array([ps.rac/mas, ps.dec/mas, ps.parallax, ps.pmrac, ps.pmdec])
     racs, decs = xij@r5d # all in mas
 
     if comOnly == True:
