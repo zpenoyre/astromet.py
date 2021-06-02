@@ -43,11 +43,11 @@ class params():
         self.ddec = 45  # degree
         self.pmrac = 0  # mas/year
         self.pmdec = 0  # mas/year
-        self.pllx = 1  # mas
+        self.parallax = 1  # mas
         # binary parameters
         self.period = 1 # year
-        self.a = 1  # AU
-        self.e = 0
+        self.a = 0  # AU
+        self.e = 0.1
         self.q = 0
         self.l = 0  # assumed < 1 (though may not matter)
         self.vtheta = 45
@@ -89,26 +89,27 @@ def track(ts, ps, comOnly=False, allComponents=False):
         - racs      ndarry - RAcosDec at each time, mas
         - decs      ndarry - Dec at each time, mas
     """
-    N = ts.size
-    xij = design_simple(ts,ps.ra,ps.dec, epoch=ps.epoch)
+    xij = design_matrix(ts, np.deg2rad(ps.rac/np.cos(np.deg2rad(ps.dec))), np.deg2rad(ps.dec), epoch=ps.epoch)
 
-    r = np.array([ps.drac, ps.ddec, ps.pllx, ps.pmrac, ps.pmdec])
-    pos = xij@r # all in mas
-    racs, decs = pos[:N], pos[N:]
+    cosdec = np.cos(np.deg2rad(ps.dec))
+    # ra*cos(dec), dec, parallax, pmra*cos(dec), pmdec
+    r5d = np.array([ps.rac/mas, ps.dec/mas, ps.parallax, ps.pmrac, ps.pmdec])
+    racs, decs = xij@r5d # all in mas
+
     if comOnly == True:
         return racs, decs
     # extra c.o.l. correction due to binary
     px1s, py1s, px2s, py2s, pxls, pyls = binaryMotion(
         ts-ps.tperi, ps.period, ps.q, ps.l, ps.a, ps.e, ps.vtheta, ps.vphi)
-    rls = ps.pllx*(pxls*np.cos(ps.vomega)+pyls*np.sin(ps.vomega))
-    dls = ps.pllx*(pyls*np.cos(ps.vomega)-pxls*np.sin(ps.vomega))
+    rls = ps.parallax*(pxls*np.cos(ps.vomega)+pyls*np.sin(ps.vomega))
+    dls = ps.parallax*(pyls*np.cos(ps.vomega)-pxls*np.sin(ps.vomega))
     if allComponents==False:
         return racs+rls, decs+dls # return just the position of the c.o.l.
     else: # returns all 3 components
-        r1s = ps.pllx*(px1s*np.cos(ps.vomega)+py1s*np.sin(ps.vomega))
-        d1s = ps.pllx*(py1s*np.cos(ps.vomega)-px1s*np.sin(ps.vomega))
-        r2s = ps.pllx*(px2s*np.cos(ps.vomega)+py2s*np.sin(ps.vomega))
-        d2s = ps.pllx*(py2s*np.cos(ps.vomega)-px2s*np.sin(ps.vomega))
+        r1s = ps.parallax*(px1s*np.cos(ps.vomega)+py1s*np.sin(ps.vomega))
+        d1s = ps.parallax*(py1s*np.cos(ps.vomega)-px1s*np.sin(ps.vomega))
+        r2s = ps.parallax*(px2s*np.cos(ps.vomega)+py2s*np.sin(ps.vomega))
+        d2s = ps.parallax*(py2s*np.cos(ps.vomega)-px2s*np.sin(ps.vomega))
         print(decs.size)
         return racs+rls, decs+dls, racs+r1s, decs+d1s, racs+r2s, decs+d2s
 
@@ -133,33 +134,56 @@ def mock_obs(phis, racs, decs, err=0):
 # ----------------
 
 
-def design_simple(ts, ra, dec, epoch=2016.0):
-    N = ts.size
-    bs = barycentricPosition(ts)
-    p0 = np.array([-np.sin(ra), np.cos(ra), 0])
-    q0 = np.array([-np.cos(ra)*np.sin(dec), -np.sin(ra)*np.sin(dec), np.cos(dec)])
-    design = np.zeros((2*N, 5))
-    design[:N, 0] = 1
-    design[N:, 1] = 1
-    design[:N, 2] = ts-epoch
-    design[N:, 3] = ts-epoch
-    design[:N, 4] = -(1/np.cos(dec))*np.dot(bs, p0)
-    design[N:, 4] = -np.dot(bs, q0)
-    return design
-
-
-def design_matrix(ts, phis, ra, dec, epoch=2016.0):
+def design_matrix(ts, ra, dec, phis=None, epoch=2016.0, project_al=False):
     """
-    There was a description of this function - but I deleted it
+    design_matrix - Design matrix for ra,dec source track
     Args:
         - t,       ndarray - Observation times, jyear.
         - phis,     ndarray - scan angles.
-        - ra, dec,  float - reference right ascension and declination of source, deg
+        - ra, dec,  float - reference right ascension and declination of source, radians
         - epoch     float - time at which position and pm are measured, years CE
     Returns:
         - design, ndarry - Design matrix
     """
-    ra, dec = np.deg2rad(ra), np.deg2rad(dec)
+    # Barycentric coordinates of Gaia at time t
+    bs = barycentricPosition(ts)
+    # unit vector in direction of increasing ra - the local west unit vector
+    p0 = np.array([-np.sin(ra), np.cos(ra), 0])
+    # unit vector in direction of increasing dec - the local north unit vector
+    q0 = np.array([-np.cos(ra)*np.sin(dec), -np.sin(ra)*np.sin(dec), np.cos(dec)])
+
+    # Construct design matrix for ra and dec positions
+    design = np.zeros((2, ts.shape[0], 5))
+    design[0,:,0] = 1 # ra*cos(dec)
+    design[1,:,1] = 1 # dec
+    design[0,:,2] = np.dot(p0, bs.T) # parallax (ra component)
+    design[1,:,2] = np.dot(q0, bs.T) # parallax (dec component)
+    design[0,:,3] = ts-epoch # pmra
+    design[1,:,4] = ts-epoch # pmdec
+
+    if project_al:
+        # sin and cos angles
+        angles = np.deg2rad(phis)
+        sina = np.sin(angles)
+        cosa = np.cos(angles)
+
+        # Construct design matrix
+        design = design[0]*sina[:,None] + design[1]*cosa[:,None]
+
+    return design
+
+
+def design_1d(ts, phis, ra, dec, epoch=2016.0):
+    """
+    design_1d - Design matrix for 1d source track in along-scan direction
+    Args:
+        - t,       ndarray - Observation times, jyear.
+        - phis,     ndarray - scan angles.
+        - ra, dec,  float - reference right ascension and declination of source, radians
+        - epoch     float - time at which position and pm are measured, years CE
+    Returns:
+        - design, ndarry - Design matrix
+    """
     # Barycentric coordinates of Gaia at time t
     bs = barycentricPosition(ts)
     # unit vector in direction of increasing ra - the local west unit vector
@@ -228,12 +252,12 @@ def findEtas(ts, period, eccentricity, tPeri=0, N_it = 10):
         N_it (float): Number of grid-points.
     Returns:
         np.ndarray: Array of eccentric anomalies, E.
-        
+
     Slightly edited version of code taken from https://github.com/oliverphilcox/Keplers-Goat-Herd
     """
-    
+
     ell_array = ((2*np.pi/period)*(ts-tPeri)) % (2.0*np.pi)
-    
+
     # Check inputs
     if eccentricity<=0.:
         raise Exception("Eccentricity must be greater than zero!")
@@ -382,7 +406,7 @@ def dtheta_simple(ps):
         _ = Delta(ps)
     Omega = np.sqrt(1-(np.cos(ps.vphi)**2) * (np.sin(ps.vtheta)**2))
     Kappa = np.sin(ps.vphi)*np.cos(ps.vphi)*(np.sin(ps.vtheta)**2)
-    pre = ps.pllx*ps.Delta*ps.a/Omega
+    pre = ps.parallax*ps.Delta*ps.a/Omega
     #print('pre: ',pre)
 
     epsx = -pre*(3/2)*ps.e*Omega**2
@@ -406,7 +430,7 @@ def dtheta_full(ps, t1, t2):
     #print('nu: ',nu)
     Omega = np.sqrt(1-(np.cos(ps.vphi)**2) * (np.sin(ps.vtheta)**2))
     Kappa = np.sin(ps.vphi)*np.cos(ps.vphi)*(np.sin(ps.vtheta)**2)
-    pre = ps.pllx*ps.Delta*ps.a/Omega
+    pre = ps.parallax*ps.Delta*ps.a/Omega
     #print('pre: ',pre)
 
     epsx1 = (1+ps.e**2)*sigma1 - ps.e*(1.5 + sigma2/4)
@@ -543,40 +567,40 @@ def path(ts,ps,t0=0):
     # (natural frame for parralax ellipse) to find on-sky c.o.m motion
     azimuth,polar,pmAzimuth,pmPolar=icrsToPercientric(ps.RA,ps.Dec,ps.pmRA,ps.pmDec)
     # centre of mass motion in pericentric frame in mas
-    dAz,dPol=comMotion(ts,polar*np.pi/180,azimuth*np.pi/180,pmPolar,pmAzimuth,ps.pllx)
+    dAz,dPol=comMotion(ts,polar*np.pi/180,azimuth*np.pi/180,pmPolar,pmAzimuth,ps.parallax)
     # and then tranform back
     ras,decs=pericentricToIcrs(azimuth+mas*dAz,polar+mas*dPol)
 
     # extra c.o.l. correction due to binary
     px1s,py1s,px2s,py2s,pxls,pyls=binaryMotion(ts-ps.tPeri,ps.M,ps.q,ps.l,ps.a,ps.e,ps.vTheta,ps.vPhi)
-    rls=mas*ps.pllx*(pxls*np.cos(ps.vOmega)+pyls*np.sin(ps.vOmega))
-    dls=mas*ps.pllx*(pyls*np.cos(ps.vOmega)-pxls*np.sin(ps.vOmega))
+    rls=mas*ps.parallax*(pxls*np.cos(ps.vOmega)+pyls*np.sin(ps.vOmega))
+    dls=mas*ps.parallax*(pyls*np.cos(ps.vOmega)-pxls*np.sin(ps.vOmega))
 
     return ras+rls,decs+dls
 
 # c.o.m motion in mas - all time in years, all angles mas except phi and theta (rad)
 # needs azimuth and polar (0 to pi) in ecliptic coords with periapse at azimuth=0
-def comMotion(ts,polar,azimuth,muPolar,muAzimuth,pllx):
+def comMotion(ts,polar,azimuth,muPolar,muAzimuth,parallax):
     taus=2*np.pi*ts+(T0/T)
     tau0=2*np.pi*T0/T
     psis=azimuth-taus
     psi0=azimuth-tau0
     dAs=((ts-AU_c*np.cos(polar)*(np.cos(psis)-np.cos(psi0)
         +e*(np.sin(taus)*np.sin(psis) - np.sin(tau0)*np.sin(psi0))))*muAzimuth
-        -(pllx/np.cos(polar))*(np.cos(psis)+e*(np.sin(taus)*np.sin(psis)-np.cos(azimuth))))
+        -(parallax/np.cos(polar))*(np.cos(psis)+e*(np.sin(taus)*np.sin(psis)-np.cos(azimuth))))
     dDs=((ts-AU_c*np.cos(polar)*(np.cos(psis)-np.cos(psi0)
         +e*(np.sin(taus)*np.sin(psis) - np.sin(tau0)*np.sin(psi0))))*muPolar
-        -pllx*np.sin(polar)*(np.sin(psis)+e*(np.sin(taus)*np.cos(psis)+np.sin(azimuth))))
+        -parallax*np.sin(polar)*(np.sin(psis)+e*(np.sin(taus)*np.cos(psis)+np.sin(azimuth))))
     return dAs,dDs
 
 # c.o.m motion in mas - all time in years, all angles mas except phi and theta (rad)
 # needs azimuth and polar (0 to pi) in ecliptic coords with periapse at azimuth=0
-def comSimple(ts, ra, dec, pmRa, pmDec, pllx, t0=0):
+def comSimple(ts, ra, dec, pmRa, pmDec, parallax, t0=0):
     bs = barycentricPosition(ts)
     p0 = np.array([-np.sin(ra), np.cos(ra), 0])
     q0 = np.array([-np.cos(ra)*np.sin(dec), -np.sin(ra)*np.sin(dec), np.cos(dec)])
-    deltaRa = pmRa*(ts-t0) - (pllx/np.cos(dec))*np.dot(bs, p0)
-    deltaDec = pmDec*(ts-t0) - pllx*np.dot(bs, q0)
+    deltaRa = pmRa*(ts-t0) - (parallax/np.cos(dec))*np.dot(bs, p0)
+    deltaDec = pmDec*(ts-t0) - parallax*np.dot(bs, q0)
     return mas*deltaRa, mas*deltaDec
 
 # 'pericentric' frame is in the ecliptic plane, with azimuth=0 at periapse
