@@ -193,8 +193,7 @@ def gaia_fit(ts, xs, phis, xerr, ra, dec, G=12, epoch=2016.0):
 
     # Design matrix
     #design = design_1d(t, phi, ra, dec, epoch=epoch)
-    design = design_matrix(ts,np.deg2rad(ra),np.deg2rad(dec),phis=phis,epoch=epoch,project_al=True)
-
+    design = design_matrix(ts,np.deg2rad(ra),np.deg2rad(dec),phis=phis,epoch=epoch)
 
     r5d_mean, r5d_cov, R, aen, weights = fit_model(xs, xerr, design, prior=prior)
     # convert mas to degrees

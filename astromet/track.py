@@ -88,11 +88,12 @@ def track(ts, ps, comOnly=False, allComponents=False):
         - decs      ndarry - Dec at each time, mas
     """
     xij = design_matrix(ts, np.deg2rad(ps.ra), np.deg2rad(ps.dec), epoch=ps.epoch)
-    xij[:2,:,:2] = 0.
+    #xij[:2,:,:2] = 0.
 
     cosdec = np.cos(np.deg2rad(ps.dec))
     # ra*cos(dec), dec, parallax, pmra*cos(dec), pmdec
-    r5d = np.array([ps.ra*cosdec/mas, ps.dec/mas, ps.parallax, ps.pmrac, ps.pmdec])
+    #r5d = np.array([ps.ra*cosdec/mas, ps.dec/mas, ps.parallax, ps.pmrac, ps.pmdec])
+    r5d = np.array([0, 0, ps.parallax, ps.pmrac, ps.pmdec])
     dracs, ddecs = xij@r5d # all in mas
 
     if comOnly == True:
@@ -116,7 +117,7 @@ def track(ts, ps, comOnly=False, allComponents=False):
 # ----------------
 
 
-def design_matrix(ts, ra, dec, phis=None, epoch=2016.0, project_al=False):
+def design_matrix(ts, ra, dec, phis=None, epoch=2016.0):
     """
     design_matrix - Design matrix for ra,dec source track
     Args:
@@ -143,7 +144,7 @@ def design_matrix(ts, ra, dec, phis=None, epoch=2016.0, project_al=False):
     design[0,:,3] = ts-epoch # pmra
     design[1,:,4] = ts-epoch # pmdec
 
-    if project_al:
+    if np.size(phis)>1:
         # sin and cos angles
         angles = np.deg2rad(phis)
         sina = np.sin(angles)
