@@ -1,5 +1,5 @@
-__all__ = ['track','fit']
+__all__ = ['track','fitting']
 
 from .track import *
-from .fit import *
+from .fitting import *
 #name = 'astromet'
