@@ -1,5 +1,26 @@
 quickstart
 ==========
+a note on coordinates
+---------------------
+
+We generally record the position of astronomical objects in a spherical
+ coordinate system, such as Right Ascension and Declination (or in an ideal
+ world for astrometry Ecliptic Longitude and Latitude).
+
+ This is *not* a euclidean geometry - Pythagoras theorem (and all our normal
+ concepts of distance) are approximately true on the equator, but increasingly
+ fall apart towards the poles.
+
+ This is why in much of this package we'll work in coordinates RA cos(Dec) and Dec,
+ which *are* euclidean. Confusingly lots of astrometric data is given in a combination
+ of these two systems. For example proper motion is almost always recorded in the
+ euclidean system, and Gaia returns position as RA [deg] but error as the uncertainty
+ in RA cos(Dec) [mas].
+
+ We'll try to replicate Gaia's conventions (even when it means parameters are just misnamed)
+ and to be clear wherever this might cause confusion.
+
+
 single body
 -----------
 Let's start with a simple single body example:
@@ -14,8 +35,6 @@ Let's start with a simple single body example:
     # center of mass parameters
     params.ra=160     #[deg]
     params.dec=-50    #[deg]
-    params.drac=0     #[mas]
-    params.ddec=0     #[mas]
     params.pmrac=8    #[mas/yr]
     params.pmdec=-2   #[mas/yr]
     params.pllx=5     #[mas]

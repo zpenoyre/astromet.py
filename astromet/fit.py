@@ -133,6 +133,29 @@ def fit_model(x_obs, x_err, M_matrix, prior=None):
 
     return r5d_mean, r5d_cov, R, aen, weights
 
+def gaia_mock(ts, phis, racs, decs, err=0, nmeasure=9):
+    """
+    Converts positions to comparable observables to real astrometric measurements
+    (i.e. 1D psoitions along some scan angle, optionlly with errors added)
+    Args:
+        - ts,       ndarray - Observation times, jyear.
+        - phis,     ndarray - Scanning angles (0 north, 90 east), degrees.
+        - racs,     ndarray - RAcosDec at each scan, mas
+        - decs,     ndarray - Dec at each scan, mas
+        - err,      float or ndarray - optional normal distributed error to be added (default 0)
+        - nmeasure, int - optinal, number of measurements per transit (default 9)
+    Returns:
+        - copies of all entered parameters measured nmeasure times with errors
+        - xs        ndarray - 1D projected displacements
+    """
+    ts= np.repeat(ts, nmeasure)
+    phis= np.repeat(phis, nmeasure)
+    errs=err*np.random.randn(ts.size)
+    racs= np.repeat(racs, nmeasure) + errs*np.sin(np.deg2rad(phis))
+    decs= np.repeat(decs, nmeasure) + errs*np.cos(np.deg2rad(phis))
+    xs=racs*np.sin(np.deg2rad(phis)) + decs*np.cos(np.deg2rad(phis))
+    return ts,xs,phis,racs,decs
+
 
 def gaia_fit(ts, xs, phis, xerr, ra, dec, G=12, epoch=2016.0):
     """
@@ -155,16 +178,10 @@ def gaia_fit(ts, xs, phis, xerr, ra, dec, G=12, epoch=2016.0):
         xerr=xerr*np.ones_like(ts)
 
     results = {}
-    results['astrometric_matched_transits']     = len(ts)
+    results['astrometric_matched_transits']     = int(len(ts)/9)
     results['visibility_periods_used'] = np.sum(np.sort(ts)[1:]*T-np.sort(ts)[:-1]*T>4)
 
-    t_ccd = np.repeat(ts, 9)
-    phi_ccd = np.repeat(phis, 9)
-    x_ccd = np.repeat(xs, 9)
-    xerr_ccd = np.repeat(xerr, 9)
-    xobs_ccd = np.random.normal(x_ccd, xerr_ccd)
-
-    results['astrometric_n_obs_al']     = len(t_ccd)
+    results['astrometric_n_obs_al']     = len(ts)
 
     # Add prior on components if fewer that 6 visibility periods
     if results['visibility_periods_used']<6:
@@ -176,10 +193,10 @@ def gaia_fit(ts, xs, phis, xerr, ra, dec, G=12, epoch=2016.0):
 
     # Design matrix
     #design = design_1d(t, phi, ra, dec, epoch=epoch)
-    design = design_matrix(t_ccd,np.deg2rad(ra),np.deg2rad(dec),phis=phi_ccd,epoch=epoch,project_al=True)
+    design = design_matrix(ts,np.deg2rad(ra),np.deg2rad(dec),phis=phis,epoch=epoch,project_al=True)
 
 
-    r5d_mean, r5d_cov, R, aen, weights = fit_model(xobs_ccd, xerr_ccd, design, prior=prior)
+    r5d_mean, r5d_cov, R, aen, weights = fit_model(xs, xerr, design, prior=prior)
     # convert mas to degrees
     r5d_mean[:2]/=(3600*1000)
     # racosdec to ra
@@ -197,10 +214,10 @@ def gaia_fit(ts, xs, phis, xerr, ra, dec, G=12, epoch=2016.0):
                 r5d_cov[i,j]/np.sqrt(r5d_cov[i,i]*r5d_cov[j,j])
 
     results['astrometric_excess_noise'] = aen
-    results['astrometric_chi2_al']      = np.sum(R**2 / xerr_ccd**2)
+    results['astrometric_chi2_al']      = np.sum(R**2 / xerr**2)
     results['astrometric_n_good_obs_al']= np.sum(weights>0.2)
     nparam=5 #results['astrometric_params_solved'].bit_count()
-    results['UWE']= np.sqrt(np.sum(R**2 / xerr_ccd**2)/(np.sum(weights>0.2)-nparam))
+    results['UWE']= np.sqrt(np.sum(R**2 / xerr**2)/(np.sum(weights>0.2)-nparam))
 
     return results
 

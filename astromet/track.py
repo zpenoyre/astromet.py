@@ -39,8 +39,6 @@ class params():
         # astrometric parameters
         self.ra = 45  # degree
         self.dec = 45  # degree
-        self.drac = 45  # degree
-        self.ddec = 45  # degree
         self.pmrac = 0  # mas/year
         self.pmdec = 0  # mas/year
         self.parallax = 1  # mas
@@ -89,12 +87,12 @@ def track(ts, ps, comOnly=False, allComponents=False):
         - racs      ndarry - RAcosDec at each time, mas
         - decs      ndarry - Dec at each time, mas
     """
-    xij = design_matrix(ts, np.deg2rad(ps.rac/np.cos(np.deg2rad(ps.dec))), np.deg2rad(ps.dec), epoch=ps.epoch)
+    xij = design_matrix(ts, np.deg2rad(ps.ra), np.deg2rad(ps.dec), epoch=ps.epoch)
     xij[:2,:,:2] = 0.
 
     cosdec = np.cos(np.deg2rad(ps.dec))
     # ra*cos(dec), dec, parallax, pmra*cos(dec), pmdec
-    r5d = np.array([ps.rac/mas, ps.dec/mas, ps.parallax, ps.pmrac, ps.pmdec])
+    r5d = np.array([ps.ra*cosdec/mas, ps.dec/mas, ps.parallax, ps.pmrac, ps.pmdec])
     dracs, ddecs = xij@r5d # all in mas
 
     if comOnly == True:
@@ -111,24 +109,7 @@ def track(ts, ps, comOnly=False, allComponents=False):
         d1s = ps.parallax*(py1s*np.cos(ps.vomega)-px1s*np.sin(ps.vomega))
         r2s = ps.parallax*(px2s*np.cos(ps.vomega)+py2s*np.sin(ps.vomega))
         d2s = ps.parallax*(py2s*np.cos(ps.vomega)-px2s*np.sin(ps.vomega))
-        print(decs.size)
         return dracs+rls, ddecs+dls, dracs+r1s, ddecs+d1s, dracs+r2s, ddecs+d2s
-
-def mock_obs(phis, racs, decs, err=0):
-    """
-    Converts positions to comparable observables to real astrometric measurements
-    (i.e. 1D psoitions along some scan angle, optionlly with errors added)
-    Args:
-        - ts,       ndarray - Observation times, jyear.
-        - phis,     ndarray - Scanning angles (0 north, 90 east), degrees.
-        - racs,     ndarray - RAcosDec at each scan, mas
-        - decs,     ndarray - Dec at each scan, mas
-        - err,     float or ndarray - optional normal distributed error to be added
-    Returns:
-        - xs        ndarray - 1D projected displacements
-    """
-    xs=racs*np.sin(np.deg2rad(phis)) + decs*np.cos(np.deg2rad(phis)) + err*np.random.randn(phis.size)
-    return xs
 
 # ----------------
 # -On-sky motion
