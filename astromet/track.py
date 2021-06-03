@@ -40,6 +40,8 @@ class params():
         # astrometric parameters
         self.ra = 45  # degree
         self.dec = 45  # degree
+        self.drac = 0 # mas
+        self.ddec = 0 # mas
         self.pmrac = 0  # mas/year
         self.pmdec = 0  # mas/year
         self.parallax = 1  # mas
@@ -89,11 +91,8 @@ def track(ts, ps, comOnly=False, allComponents=False):
         - decs      ndarry - Dec at each time, mas
     """
     xij = design_matrix(ts, np.deg2rad(ps.ra), np.deg2rad(ps.dec), epoch=ps.epoch)
-    xij[:2,:,:2] = 0.
 
-    cosdec = np.cos(np.deg2rad(ps.dec))
-    # ra*cos(dec), dec, parallax, pmra*cos(dec), pmdec
-    r5d = np.array([ps.ra*cosdec/mas, ps.dec/mas, ps.parallax, ps.pmrac, ps.pmdec])
+    r5d = np.array([ps.drac, ps.ddec, ps.parallax, ps.pmrac, ps.pmdec])
     dracs, ddecs = xij@r5d # all in mas
 
     if comOnly == True:
@@ -117,7 +116,7 @@ def track(ts, ps, comOnly=False, allComponents=False):
 # ----------------
 
 
-def design_matrix(ts, ra, dec, phis=None, epoch=2016.0, project_al=False):
+def design_matrix(ts, ra, dec, phis=None, epoch=2016.0):
     """
     design_matrix - Design matrix for ra,dec source track
     Args:
@@ -144,7 +143,7 @@ def design_matrix(ts, ra, dec, phis=None, epoch=2016.0, project_al=False):
     design[0,:,3] = ts-epoch # pmra
     design[1,:,4] = ts-epoch # pmdec
 
-    if project_al:
+    if np.size(phis)>1:
         # sin and cos angles
         angles = np.deg2rad(phis)
         sina = np.sin(angles)
@@ -155,7 +154,7 @@ def design_matrix(ts, ra, dec, phis=None, epoch=2016.0, project_al=False):
 
     return design
 
-
+'''
 def design_1d(ts, phis, ra, dec, epoch=2016.0):
     """
     design_1d - Design matrix for 1d source track in along-scan direction
@@ -188,7 +187,7 @@ def design_1d(ts, phis, ra, dec, epoch=2016.0):
     design[:, 3] = sina*(ts-epoch)
     design[:, 4] = cosa*(ts-epoch)
 
-    return design
+    return design'''
 
 
 def barycentricPosition(time):
@@ -385,6 +384,7 @@ def sigmagamma(eta1, eta2):
 
 def dtheta_simple(ps):
     # assuming ~uniform sampling of pos between t1 and t2 can estimate UWE
+    # CURRENTLY HAS A BUG I HAVEN'T CHASED DOWN GIVING NANS SOMETIMES
     if ps.Delta == -1:
         _ = Delta(ps)
     Omega = np.sqrt(1-(np.cos(ps.vphi)**2) * (np.sin(ps.vtheta)**2))
@@ -397,11 +397,11 @@ def dtheta_simple(ps):
 
     epsxsq = (pre**2)*(Omega**4)*(1/2)*(1+2*ps.e**2)
     epsysq = (pre**2)*(np.cos(ps.vtheta)**2)*(1/2)*(1-ps.e**2)
-
     return np.sqrt(epsxsq+epsysq-(epsx**2)-(epsy**2))
 
 def dtheta_full(ps, t1, t2):
     # assuming ~uniform sampling of pos between t1 and t2 can estimate UWE
+    # CURRENTLY HAS A BUG I HAVEN'T CHASED DOWN GIVING NANS SOMETIMES
     if ps.Delta == -1:
         _ = Delta(ps)
     eta1 = findEtas(t1, ps.period, ps.e, tPeri=ps.tperi)
@@ -432,7 +432,6 @@ def dtheta_full(ps, t1, t2):
 
     epsysq = nu*(pre**2)*(np.cos(ps.vtheta)**2)*(1-ps.e**2) * \
         (0.5 - sigma2/4 - ps.e*(sigma1/4 - sigma3/12))
-
     return np.sqrt(epsxsq+epsysq-(epsx**2)-(epsy**2))
 
 # ----------------------
@@ -498,135 +497,3 @@ def splitFit(xs):  # fits a split normal distribution to an array of data
     Z = ks[np.argmin(np.abs(phi_ks))]
 
     return xs[Z], sigma, cigma
-
-
-# ----------------------------------------------
-# - Legacy (old code I'm keeping for reference)
-# ----------------------------------------------
-
-'''def uweObs(ts, racs, decs, r5d, phis=None, astError=1):
-    nTs = ts.size
-    medDec = mas*np.median(decs) # deg
-    medRa = mas*np.median(racs)/np.cos(np.deg2rad(medDec)) # deg
-    # Design matrix
-    design_ts=np.hstack([ts,ts])
-    design_phis=np.hstack([90*np.ones_like(ts),np.zeros_like(ts)])
-    xij = design_matrix(design_ts,design_phis,ps.RA,ps.Dec, epoch=ps.epoch)
-
-    xij = XijSimple(ts, medRa*np.pi/180, medDec*np.pi/180)
-
-    dRas = ras-medRa-mas*(xij@fitParams)[:nTs]
-    dDecs = decs-medDec-mas*(xij@fitParams)[nTs:]
-    diff = np.sqrt(dRas**2 + dDecs**2)
-    return np.sqrt(np.sum((diff/(mas*astError))**2)/(nTs-5))'''
-'''# For more details on the fit see section 1 of Hogg, Bovy & Lang 2010
-def fit(ts, ras, decs, astError=1):
-    # Error precision matrix
-    if np.isscalar(astError):  # scalar astrometric error given
-        astPrec = np.diag((astError**-2)*np.ones(2*ts.size))
-    elif len(astError.shape) == 1:  # vector astrometric error given
-        astPrec = np.diag((astError**-2))
-    else:
-        astPrec = astError**-2
-    # convenient to work entirely in mas, relative to median RA and Dec
-    medRa = np.median(ras)
-    medDec = np.median(decs)
-    diffRa = (ras-medRa)/mas
-    diffDec = (decs-medDec)/mas
-    # Design matrix
-    xij = XijSimple(ts, medRa*np.pi/180, medDec*np.pi/180)
-    # Astrometry covariance matrix
-    cov = np.linalg.inv(xij.T@astPrec@xij)
-    params = cov@xij.T@astPrec@np.hstack([diffRa, diffDec])
-    # all parameters in mas(/yr) - ra and dec give displacement *from median*
-    return params, cov'''
-'''
-# T0 - interval between last periapse before survey (2456662.00 BJD)
-# and start of survey (2456863.94 BJD) in days
-T0 = 201.938
-
-def path(ts,ps,t0=0):
-    # need to transofrm to eclitpic coords centered on periapse
-    # (natural frame for parralax ellipse) to find on-sky c.o.m motion
-    azimuth,polar,pmAzimuth,pmPolar=icrsToPercientric(ps.RA,ps.Dec,ps.pmRA,ps.pmDec)
-    # centre of mass motion in pericentric frame in mas
-    dAz,dPol=comMotion(ts,polar*np.pi/180,azimuth*np.pi/180,pmPolar,pmAzimuth,ps.parallax)
-    # and then tranform back
-    ras,decs=pericentricToIcrs(azimuth+mas*dAz,polar+mas*dPol)
-
-    # extra c.o.l. correction due to binary
-    px1s,py1s,px2s,py2s,pxls,pyls=binaryMotion(ts-ps.tPeri,ps.M,ps.q,ps.l,ps.a,ps.e,ps.vTheta,ps.vPhi)
-    rls=mas*ps.parallax*(pxls*np.cos(ps.vOmega)+pyls*np.sin(ps.vOmega))
-    dls=mas*ps.parallax*(pyls*np.cos(ps.vOmega)-pxls*np.sin(ps.vOmega))
-
-    return ras+rls,decs+dls
-
-# c.o.m motion in mas - all time in years, all angles mas except phi and theta (rad)
-# needs azimuth and polar (0 to pi) in ecliptic coords with periapse at azimuth=0
-def comMotion(ts,polar,azimuth,muPolar,muAzimuth,parallax):
-    taus=2*np.pi*ts+(T0/T)
-    tau0=2*np.pi*T0/T
-    psis=azimuth-taus
-    psi0=azimuth-tau0
-    dAs=((ts-AU_c*np.cos(polar)*(np.cos(psis)-np.cos(psi0)
-        +e*(np.sin(taus)*np.sin(psis) - np.sin(tau0)*np.sin(psi0))))*muAzimuth
-        -(parallax/np.cos(polar))*(np.cos(psis)+e*(np.sin(taus)*np.sin(psis)-np.cos(azimuth))))
-    dDs=((ts-AU_c*np.cos(polar)*(np.cos(psis)-np.cos(psi0)
-        +e*(np.sin(taus)*np.sin(psis) - np.sin(tau0)*np.sin(psi0))))*muPolar
-        -parallax*np.sin(polar)*(np.sin(psis)+e*(np.sin(taus)*np.cos(psis)+np.sin(azimuth))))
-    return dAs,dDs
-
-# c.o.m motion in mas - all time in years, all angles mas except phi and theta (rad)
-# needs azimuth and polar (0 to pi) in ecliptic coords with periapse at azimuth=0
-def comSimple(ts, ra, dec, pmRa, pmDec, parallax, t0=0):
-    bs = barycentricPosition(ts)
-    p0 = np.array([-np.sin(ra), np.cos(ra), 0])
-    q0 = np.array([-np.cos(ra)*np.sin(dec), -np.sin(ra)*np.sin(dec), np.cos(dec)])
-    deltaRa = pmRa*(ts-t0) - (parallax/np.cos(dec))*np.dot(bs, p0)
-    deltaDec = pmDec*(ts-t0) - parallax*np.dot(bs, q0)
-    return mas*deltaRa, mas*deltaDec
-
-# 'pericentric' frame is in the ecliptic plane, with azimuth=0 at periapse
-def icrsToPercientric(ra,dec,pmra=0,pmdec=0):
-    coord=astropy.coordinates.SkyCoord(ra=ra*u.degree, dec=dec*u.degree,
-        pm_ra_cosdec=pmra*np.cos(dec*np.pi/180)*u.mas/u.yr,
-        pm_dec=pmdec*u.mas/u.yr, frame='icrs')
-    bary=coord.barycentrictrueecliptic
-    polar=bary.lat.degree
-    azimuth=bary.lon.degree+75 # 75° is offset from periapse to equinox
-    if (pmra==0) & (pmdec==0):
-        return azimuth,polar
-    else:
-        pmPolar=bary.pm_lat.value # in mas/yr
-        pmAzimuth=bary.pm_lon_coslat.value/np.cos(polar*np.pi/180)
-        return azimuth,polar,pmAzimuth,pmPolar
-def pericentricToIcrs(az,pol,pmaz=0,pmpol=0):
-    coords=astropy.coordinates.SkyCoord(lon=(az-75)*u.degree, lat=pol*u.degree,
-    pm_lon_coslat=pmaz*np.cos(pol*np.pi/180)*u.mas/u.yr,
-    pm_lat=pmpol*u.mas/u.yr, frame='barycentrictrueecliptic')
-    icrs=coords.icrs
-    ra=icrs.ra.degree
-    dec=icrs.dec.degree
-    if (pmaz==0) & (pmpol==0):
-        return ra,dec
-    else:
-        pmDec=bary.pm_dec.value # in mas/yr
-        pmRa=bary.pm_ra_cosdec.value/np.cos(dec*np.pi/180)
-        return ra,dec,pmRa,pmDec
-
-def Xij(ts,phi,theta):
-    N=ts.size
-    taus=2*np.pi*ts+(T0/T)
-    tau0=2*np.pi*T0/T
-    psis=phi-taus
-    psi0=phi-tau0
-    tb=AU_c*np.cos(theta)*(np.cos(psis)-np.cos(psi0)
-        +e*(np.sin(taus)*np.sin(psis) - np.sin(tau0)*np.sin(psi0)))
-    xij=np.zeros((2*N,5))
-    xij[:N,0]=1
-    xij[N:,1]=1
-    xij[:N,2]=ts-tb
-    xij[N:,3]=ts-tb
-    xij[:N,4]=-(1/np.cos(theta))*(np.cos(psis)+e*(np.sin(taus)*np.sin(psis)-np.cos(phi)))
-    xij[N:,4]=-np.sin(theta)*(np.sin(psis)+e*(np.sin(taus)*np.cos(psis)+np.sin(phi)))
-    return xij'''

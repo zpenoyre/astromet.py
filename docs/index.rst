@@ -13,7 +13,7 @@ Make and fit astrometric tracks
 
    installation
    quickstart
-   gaia_fit()
+   fit()
 
 
 
