@@ -286,3 +286,70 @@ def simple_fit(ts, racs, decs, errs, ra, dec, G=12, epoch=2016.0):
     results['dec_ref']=dec
 
     return results
+
+# keeping below for reference, effectively same as gaia_fit() but with slightly different use case/input
+def agis(r5d, t, phi, x_err, extra=None, epoch=2016.0, G=None):
+    """
+    Iterative optimization to fit astrometric solution in AGIS (outer iteration). Lindegren 2012.
+    Args:
+        - r5d,        ndarray - 5D astrometry of source - (ra, dec (deg), parallax (mas), mura, mudec (mas/y))
+        - t,          ndarray - source observation times - (julian days relative to Gaia observation start?)
+        - phi,        ndarray - source observation scan angles
+        - x_err,      ndarray - scan measurement error
+        - extra,  function or None - Takes times and returns offset of centroid from CoM in mas.
+    Returns:
+        - gaia_dr2, dict - output data Gaia would produce
+    """
+
+    results = {}
+    results['astrometric_matched_transits']     = len(t)
+    results['visibility_periods_used'] = np.sum(np.sort(t)[1:]*T-np.sort(t)[:-1]*T>4)
+
+    t = np.repeat(t, 9)
+    phi = np.repeat(phi, 9)
+    x_err = np.repeat(x_err, 9)
+
+
+    results['astrometric_n_obs_al']     = len(t)
+
+    # Add prior on components if fewer that 6 visibility periods
+    if results['visibility_periods_used']<6:
+        prior = agis_2d_prior(r5d[0], r5d[1], G)
+        results['astrometric_params_solved']=3
+    else:
+        prior = np.zeros((5,5))
+        results['astrometric_params_solved']=31
+
+    # Design matrix
+    design = design_1d(t, phi, r5d[0], r5d[1], epoch=epoch)
+
+    # Transform ra,dec to milliarcsec
+    r5d[:2] = r5d[:2]*(3600*1000)
+
+    # Astrometric position of source
+    x_obs  = np.matmul(design, r5d)
+    # Excess motion
+    if extra is not None:
+        x_obs += np.sum(np.vstack((np.sin(np.deg2rad(phi)), np.cos(np.deg2rad(phi))))*extra(t), axis=0)
+    # Measurement Error
+    x_obs += np.random.normal(0, x_err)
+
+    r5d_mean, r5d_cov, R, aen, weights = fit_model(x_obs, x_err, design, prior=prior)
+    # Transform ra,dec to degrees
+    r5d_mean[:2] = r5d_mean[:2]/(3600*1000)
+
+    coords = ['ra', 'dec', 'parallax', 'pmra', 'pmdec']
+    for i in range(5):
+        results[coords[i]] = r5d_mean[i]
+        results[coords[i]+'_error'] = np.sqrt(r5d_cov[i,i])
+        for j in range(i):
+            results[coords[j]+'_'+coords[i]+'_corr']=\
+                r5d_cov[i,j]/np.sqrt(r5d_cov[i,i]*r5d_cov[j,j])
+
+    results['astrometric_excess_noise'] = aen
+    results['astrometric_chi2_al']      = np.sum(R**2 / x_err**2)
+    results['astrometric_n_good_obs_al']= np.sum(weights>0.2)
+    nparam=5 #results['astrometric_params_solved'].bit_count()
+    results['UWE']= np.sqrt(np.sum(R**2 / x_err**2)/(np.sum(weights>0.2)-nparam))
+
+    return results
