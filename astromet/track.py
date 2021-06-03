@@ -21,6 +21,7 @@ AU_c = (1.0*u.AU/constants.c).to(u.day).value
 Galt = constants.G.to(u.AU**3/u.M_sun/u.year**2).value
 mas2rad = (1.0*u.mas).to(u.rad).value
 mas = (1.0*u.mas).to(u.deg).value
+earth_sun_mass_ratio = (constants.M_earth/constants.M_sun).value
 
 # loads data needed to find astrometric error as functon of magnitude
 local_dir = os.path.dirname(__file__) #<-- absolute dir the script is in
@@ -195,7 +196,7 @@ def barycentricPosition(time):
     ys = pos.y.value
     zs = pos.z.value
     # gaia satellite is at Earth-Sun L2
-    l2corr = 1+np.power(3e-6/3, 1/3)  # 3(.003)e-6 is earth/sun mass ratio
+    l2corr = 1+np.power(earth_sun_mass_ratio/3, 1/3)
     return l2corr*np.vstack([xs, ys, zs]).T
 
 
