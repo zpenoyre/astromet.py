@@ -287,6 +287,9 @@ def simple_fit(ts, racs, decs, errs, ra, dec, G=12, epoch=2016.0):
 
     return results
 
+def gaia_fit(ts, xs, phis, xerr, ra, dec, G=12, epoch=2016.0):
+    return gaia_results(fit(ts, xs, phis, xerr, ra, dec, G=12, epoch=2016.0))
+
 # keeping below for reference, effectively same as gaia_fit() but with slightly different use case/input
 def agis(r5d, t, phi, x_err, extra=None, epoch=2016.0, G=None):
     """
