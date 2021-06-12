@@ -22,6 +22,7 @@ Galt = constants.G.to(u.AU**3/u.M_sun/u.year**2).value
 mas2rad = (1.0*u.mas).to(u.rad).value
 mas = (1.0*u.mas).to(u.deg).value
 earth_sun_mass_ratio = (constants.M_earth/constants.M_sun).value
+tbegin= 2014.6670 # time (in years) of Gaia's first observations
 
 # loads data needed to find astrometric error as functon of magnitude
 local_dir = os.path.dirname(__file__) #<-- absolute dir the script is in
@@ -439,6 +440,23 @@ def dtheta_full(ps, t1, t2):
 # ----------------------
 # returns a number to a given significant digits (if extra true also returns exponent)
 
+def viewing_angles(la,i,ap):
+    """Converts conentional orbital elements to our coordinate system
+    Args:
+        long_asc (radians): Longitude of ascending node
+        incl (radians): Inclination
+        arg_peri (radians): Periastron argument
+    Returns:
+        vtheta (radians): polar viewing angle
+        vphi (radians): azimuthal viewing angle
+        vomega (radians): rotation of the viewing plane
+    """
+    vtheta=i
+    vphi=la - np.pi/2
+    num=np.cos(la)*np.sin(ap) + np.sin(la)*np.cos(i)*np.cos(ap)
+    denom=np.cos(la)*np.cos(ap) - np.sin(la)*np.cos(i)*np.sin(ap)
+    vomega=np.arctan2(num,denom)
+    return vtheta,vphi,vomega
 
 def sigString(number, significantFigures, extra=False):
     roundingFactor = significantFigures - int(np.floor(np.log10(np.abs(number)))) - 1
