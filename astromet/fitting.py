@@ -98,7 +98,7 @@ def fit_model(x_obs, x_err, M_matrix, prior=None):
     aen = 0
     weights = np.ones(len(x_obs))
 
-    W = np.eye(len(x_obs))*weights/(x_err**2 + aen)
+    W = np.eye(len(x_obs))*weights/(x_err**2 + aen**2)
     r5d_cov = np.linalg.inv(np.matmul(M_matrix.T, np.matmul(W, M_matrix))+prior)
     r5d_mean = np.matmul(r5d_cov, np.matmul(M_matrix.T, np.matmul(W, x_obs)))
     R = x_obs - np.matmul(M_matrix, r5d_mean)
@@ -112,7 +112,7 @@ def fit_model(x_obs, x_err, M_matrix, prior=None):
     for ii in range(10):
 
         # Step 2 - Astrometry linear regression
-        W = np.eye(len(x_obs))*weights/(x_err**2 + aen)
+        W = np.eye(len(x_obs))*weights/(x_err**2 + aen**2)
         r5d_cov = np.linalg.inv(np.matmul(M_matrix.T, np.matmul(W, M_matrix))+prior)
         r5d_mean = np.matmul(r5d_cov, np.matmul(M_matrix.T, np.matmul(W, x_obs)))
         R = x_obs - np.matmul(M_matrix, r5d_mean)

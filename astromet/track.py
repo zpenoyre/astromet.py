@@ -72,7 +72,7 @@ def bjd_to_bjyr(bjddate):
     return (bjddate - 1721057.5)/T
 
 def totalmass(ps):
-    ps.totalmass=4*(np.pi**2)*Galt/((ps.period**2)*(ps.a**3))
+    ps.totalmass=(4*(np.pi**2)/Galt)*((ps.a**3)/(ps.period**2))
     return ps.totalmass
 
 def Delta(ps):
