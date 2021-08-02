@@ -24,6 +24,8 @@ mas = (1.0*u.mas).to(u.deg).value
 earth_sun_mass_ratio = (constants.M_earth/constants.M_sun).value
 tbegin= 2014.6670 # time (in years) of Gaia's first observations
 
+use_backup=False # If set to true use simpler backup Kepler equation solver.
+
 # loads data needed to find astrometric error as functon of magnitude
 local_dir = os.path.dirname(__file__) #<-- absolute dir the script is in
 rel_path = '/data/scatteral_edr3.csv'
@@ -216,7 +218,7 @@ def conditional_njit(backup = None):
                 return backup
     return decorator
 
-def findEtas_backup(ts, period, eccentricity, tPeri=0, N_it = None):  # finds an (approximate) eccentric anomaly (see Penoyre & Sandford 2019, appendix A)
+def findEtas_backup(ts, period, eccentricity, tPeri=0):  # finds an (approximate) eccentric anomaly (see Penoyre & Sandford 2019, appendix A)
     eta0s =  ((2*np.pi/period)*(ts-tPeri)) % (2.0*np.pi) # (2*np.pi/period)*(ts-tPeri)
     eta1s = eccentricity*np.sin(eta0s)
     eta2s = (eccentricity**2)*np.sin(eta0s)*np.cos(eta0s)
@@ -238,6 +240,8 @@ def findEtas(ts, period, eccentricity, tPeri=0, N_it = 10):
 
     Slightly edited version of code taken from https://github.com/oliverphilcox/Keplers-Goat-Herd
     """
+    if use_backup==True:
+        return findEtas_backup(ts, period, eccentricity, tPeri=tPeri)
 
     ell_array = ((2*np.pi/period)*(ts-tPeri)) % (2.0*np.pi)
 
@@ -383,9 +387,17 @@ def sigmagamma(eta1, eta2):
     gamma3 = (np.cos(3*eta2)-np.cos(3*eta1))/deta
     return sigma1, sigma2, sigma3, gamma1, gamma2, gamma3
 
+
+def sigmagammahat(eta1, eta2):
+    deta = eta2-eta1
+    sigmahat1 = (eta2*np.sin(eta2)-eta1*np.sin(eta1))/deta
+    sigmahat2 = (eta2*np.sin(2*eta2)-eta1*np.sin(2*eta1))/deta
+    gammahat1 = (eta2*np.cos(eta2)-eta1*np.cos(eta1))/deta
+    gammahat2 = (eta2*np.cos(2*eta2)-eta1*np.cos(2*eta1))/deta
+    return sigmahat1, sigmahat2, gammahat1, gammahat2
+
 def dtheta_simple(ps):
-    # assuming ~uniform sampling of pos between t1 and t2 can estimate UWE
-    # CURRENTLY HAS A BUG I HAVEN'T CHASED DOWN GIVING NANS SOMETIMES
+    # assuming ~uniform sampling in time and one period observed
     if ps.Delta == -1:
         _ = Delta(ps)
     Omega = np.sqrt(1-(np.cos(ps.vphi)**2) * (np.sin(ps.vtheta)**2))
@@ -396,44 +408,96 @@ def dtheta_simple(ps):
     epsx = -pre*(3/2)*ps.e*Omega**2
     epsy = 0
 
-    epsxsq = (pre**2)*(Omega**4)*(1/2)*(1+2*ps.e**2)
+    epsxsq = (pre**2)*((Omega**4)*((1+4*ps.e**2)/2)
+    + (1/2)*(Kappa**2)*(1-ps.e**2))
     epsysq = (pre**2)*(np.cos(ps.vtheta)**2)*(1/2)*(1-ps.e**2)
     return np.sqrt(epsxsq+epsysq-(epsx**2)-(epsy**2))
 
 def dtheta_full(ps, t1, t2):
-    # assuming ~uniform sampling of pos between t1 and t2 can estimate UWE
-    # CURRENTLY HAS A BUG I HAVEN'T CHASED DOWN GIVING NANS SOMETIMES
+    # assuming ~uniform sampling in time between t1 and t2
+    # and some known period
     if ps.Delta == -1:
         _ = Delta(ps)
     eta1 = findEtas(t1, ps.period, ps.e, tPeri=ps.tperi)
     eta2 = findEtas(t2, ps.period, ps.e, tPeri=ps.tperi)
     sigma1, sigma2, sigma3, gamma1, gamma2, gamma3 = sigmagamma(eta1, eta2)
-    # print(sigma1,sigma2,sigma3,gamma1,gamma2,gamma3)
-    # expected
+    sigmahat1, sigmahat2, gammahat1, gammahat2 = sigmagammahat(eta1, eta2)
+
     nu = 1/(1-ps.e*sigma1)
-    #print('nu: ',nu)
     Omega = np.sqrt(1-(np.cos(ps.vphi)**2) * (np.sin(ps.vtheta)**2))
     Kappa = np.sin(ps.vphi)*np.cos(ps.vphi)*(np.sin(ps.vtheta)**2)
+
     pre = ps.parallax*ps.Delta*ps.a/Omega
-    #print('pre: ',pre)
 
-    epsx1 = (1+ps.e**2)*sigma1 - ps.e*(1.5 + sigma2/4)
-    epsx2 = gamma1-ps.e*gamma2/4
-    epsx = nu*pre*(epsx1*Omega**2 + Kappa*np.sqrt(1-ps.e**2)*epsx2)
+    #epsx1 = (1+ps.e**2)*sigma1 - ps.e*(1.5 + sigma2/4)
+    epsxa = -(3*ps.e/2) + (1+ps.e**2)*sigma1 - (ps.e/4)*sigma2
+    epsxb = gamma1-(ps.e/4)*gamma2
+    epsx = nu*pre*(epsxa*Omega**2 + Kappa*np.sqrt(1-ps.e**2)*epsxb)
 
-    epsy = -nu*pre*np.cos(ps.vtheta)*np.sqrt(1-ps.e**2)*(gamma1-ps.e*gamma2/4)
+    epsy = -nu*pre*np.cos(ps.vtheta)*np.sqrt(1-ps.e**2)*(gamma1-(ps.e/4)*gamma2)
 
-    epsxsq1 = (1+2*ps.e**2)*(0.5+sigma2/4)-ps.e*(2+ps.e**2)*sigma1
-    -ps.e*(3*sigma1/4 + sigma3/12)+ps.e**2
-    epsxsq2 = (1+ps.e**2)*(gamma2/4)-ps.e*gamma1-ps.e*(gamma1/4 + gamma3/12)
-    epsxsq3 = 0.5-sigma2/4-ps.e*(sigma1/4 - sigma3/12)
-    epsxsq = nu*(pre**2)*((Omega**4)*epsxsq1
-                          + 2*(Omega**2)*Kappa*np.sqrt(1-ps.e**2)*epsxsq2
-                          + (Kappa**2)*(1-ps.e**2)*epsxsq3)
+    #epsxsq1 = (1+2*ps.e**2)*(0.5+sigma2/4)-ps.e*(2+ps.e**2)*sigma1
+    #-ps.e*(3*sigma1/4 + sigma3/12)+ps.e**2
+    epsxsqa = ((1+4*ps.e**2)/2)-((11+4*ps.e**2)/4)*ps.e*sigma1
+    +((1+2*ps.e**2)/4)*sigma2 - (ps.e/12)*sigma3
+    #epsxsq2 = (1+ps.e**2)*(gamma2/4)-ps.e*gamma1-ps.e*(gamma1/4 + gamma3/12)
+    epsxsqb = (5*ps.e/4)*gamma1 - ((1+ps.e**2)/4)*gamma2 + (ps.e/12)*gamma3
+    #epsxsq3 = 0.5-sigma2/4-ps.e*(sigma1/4 - sigma3/12)
+    epsxsqc = (1/2) - (ps.e/4)*sigma1 - (1/4)*sigma2 + (ps.e/12)*sigma3
+    epsxsq = nu*(pre**2)*((Omega**4)*epsxsqa
+                          + 2*(Omega**2)*Kappa*np.sqrt(1-ps.e**2)*epsxsqb
+                          + (Kappa**2)*(1-ps.e**2)*epsxsqc)
 
-    epsysq = nu*(pre**2)*(np.cos(ps.vtheta)**2)*(1-ps.e**2) * \
-        (0.5 - sigma2/4 - ps.e*(sigma1/4 - sigma3/12))
-    return np.sqrt(epsxsq+epsysq-(epsx**2)-(epsy**2))
+    epsysq = nu*(pre**2)*(np.cos(ps.vtheta)**2)*(1-ps.e**2)*\
+    ((1/2) - (ps.e/4)*sigma1 - (1/4)*sigma2 + (ps.e/12)*sigma3)
+
+    av_epssq=epsxsq+epsysq
+    aveps_sq=epsx**2 + epsy**2
+
+    eps1x=pre*((Omega**2)*(np.cos(eta1)-ps.e) - Kappa*np.sqrt(1-ps.e**2)*np.sin(eta1))
+    eps2x=pre*((Omega**2)*(np.cos(eta2)-ps.e) - Kappa*np.sqrt(1-ps.e**2)*np.sin(eta2))
+    epscx=(eps1x+eps2x)/2
+
+    eps1y=pre*np.cos(ps.vtheta)*np.sqrt(1-ps.e**2)*np.sin(eta1)
+    eps2y=pre*np.cos(ps.vtheta)*np.sqrt(1-ps.e**2)*np.sin(eta2)
+    epscy=(eps1y+eps2y)/2
+
+    av_epscsq=eps1x*eps2x + eps1y*eps2y
+    +(1/12)*((eps2x-eps1x)**2 + (eps2y-eps1y)**2)
+    avepsc_sq=epscx**2 + epscy**2
+
+    mucx=(eps2x-eps1x)/(t2-t1)
+    mucy=(eps2y-eps1y)/(t2-t1)
+    print('_mucx: ',mucx)
+    print('_mucy: ',mucy)
+
+    crossepsxa=-ps.e*(eta1+eta2) + ((4+5*ps.e+4*ps.e**2)/4)*gamma1
+    -((2-ps.e+2*ps.e**2)/8)*gamma2 + (ps.e/12)*gamma3
+    -(1+ps.e**2)*sigmahat1 + (ps.e/4)*sigmahat2
+    crossepsxb=(ps.e/2) - ((4+ps.e**2)/4)*sigma1 - (ps.e/8)*sigma2
+    +(ps.e**2/12)*sigma3 + gammahat1 - (ps.e/4)*gammahat2
+
+    crossepsx=nu*(pre)*((Omega**2)*crossepsxa + Kappa*np.sqrt(1-ps.e**2)*crossepsxb)
+    crossepsy=-nu*pre*np.cos(ps.vtheta)*np.sqrt(1-ps.e**2)*((ps.e/2) -
+                ((4+ps.e**2)/4)*sigma1 - (ps.e/8)*sigma2 +(ps.e**2/12)*sigma3 +
+                gammahat1 -(ps.e/4)*gammahat2)
+
+    av_epsepscx=(eps1x+mucx*(ps.tperi-t1))*epsx
+    +(ps.period/(2*np.pi))*mucx*crossepsx
+    av_epsepscy=(eps1y+mucy*(ps.tperi-t1))*epsy
+    +(ps.period/(2*np.pi))*mucy*crossepsy
+
+    av_epsepsc=av_epsepscx+av_epsepscy
+    aveps_avepsc=epsx*epscx + epsy*epscy
+
+    print('_av_epssq: ',av_epssq)
+    print('_aveps_sq: ',aveps_sq)
+    print('_av_epscsq: ',av_epscsq)
+    print('_avepsc_sq: ',avepsc_sq)
+    print('_av_epsepsc: ',av_epsepsc)
+    print('_aveps_avepsc: ',aveps_avepsc)
+
+    return np.sqrt(av_epssq-aveps_sq+av_epscsq-avepsc_sq-2*(av_epsepsc-aveps_avepsc))
 
 # ----------------------
 # -Utilities
