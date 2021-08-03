@@ -3,7 +3,7 @@ import astropy.coordinates
 from astropy import units as u
 from astropy.time import Time
 
-from .track import *
+from .tracks import *
 
 def get_obmt(times):
     return 1717.6256+((np.array(times) + 2455197.5 - 2457023.5 - 0.25)*4)

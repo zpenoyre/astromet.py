@@ -219,6 +219,7 @@ def conditional_njit(backup = None):
     return decorator
 
 def findEtas_backup(ts, period, eccentricity, tPeri=0):  # finds an (approximate) eccentric anomaly (see Penoyre & Sandford 2019, appendix A)
+    print('using backup Kepler equation solver')
     eta0s =  ((2*np.pi/period)*(ts-tPeri)) % (2.0*np.pi) # (2*np.pi/period)*(ts-tPeri)
     eta1s = eccentricity*np.sin(eta0s)
     eta2s = (eccentricity**2)*np.sin(eta0s)*np.cos(eta0s)
