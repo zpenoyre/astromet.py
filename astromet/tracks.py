@@ -47,7 +47,7 @@ class params():
         self.ddec = 0 # mas
         self.pmrac = 0  # mas/year
         self.pmdec = 0  # mas/year
-        self.parallax = 1  # mas
+        self.parallax = 0  # mas
         # binary parameters
         self.period = 1 # year
         self.a = 0  # AU
@@ -414,7 +414,7 @@ def dtheta_simple(ps):
     epsysq = (pre**2)*(np.cos(ps.vtheta)**2)*(1/2)*(1-ps.e**2)
     return np.sqrt(epsxsq+epsysq-(epsx**2)-(epsy**2))
 
-def dtheta_full(ps, t1, t2):
+def dtheta_full(ps, t1, t2, return_pm=False):
     # assuming ~uniform sampling in time between t1 and t2
     # and some known period
     if ps.Delta == -1:
@@ -423,7 +423,8 @@ def dtheta_full(ps, t1, t2):
     eta2 = findEtas(t2, ps.period, ps.e, tPeri=ps.tperi)
 
     # using latest periapse time before t1
-    tperi=ps.tperi+ps.period*int((t1-ps.tperi)/ps.period)
+    tperi=ps.tperi+ps.period*int(1+(t1-ps.tperi)/ps.period)
+    tm=(t1+t2)/2
     # findEtas always(?) returns values betwen 0 and 2*pi
     # for most uses this is what we want (eta mostly appears in trig.)
     # here however we don't want to lose fators of 2*pi
@@ -466,61 +467,38 @@ def dtheta_full(ps, t1, t2):
 
     eps1x=pre*((Omega**2)*(np.cos(eta1)-ps.e) - Kappa*np.sqrt(1-ps.e**2)*np.sin(eta1))
     eps2x=pre*((Omega**2)*(np.cos(eta2)-ps.e) - Kappa*np.sqrt(1-ps.e**2)*np.sin(eta2))
-    epscx=(eps1x+eps2x)/2
+    #epscx=(eps1x+eps2x)/2
 
     eps1y=pre*np.cos(ps.vtheta)*np.sqrt(1-ps.e**2)*np.sin(eta1)
     eps2y=pre*np.cos(ps.vtheta)*np.sqrt(1-ps.e**2)*np.sin(eta2)
-    epscy=(eps1y+eps2y)/2
 
-    av_epscsq=eps1x*eps2x + eps1y*eps2y +(1/3)*(((eps2x-eps1x)**2) + ((eps2y-eps1y)**2))
-    avepsc_sq=epscx**2 + epscy**2
-    print('c terms: ',av_epscsq-avepsc_sq)
+    epsdotx=(eps2x-eps1x)/(t2-t1)
+    epsdoty=(eps2y-eps1y)/(t2-t1)
 
-    mucx=(eps2x-eps1x)/(t2-t1)
-    mucy=(eps2y-eps1y)/(t2-t1)
-    print('_mucx: ',mucx)
-    print('_mucy: ',mucy)
-    print('_eps1x: ',eps1x)
-    print('_eps1y: ',eps1y)
-    print('period/2pi: ',ps.period/(2*np.pi))
-    print('t0: ',ps.tperi)
-    print('t0-t1/period: ',(ps.tperi-t1)/ps.period)
+    epsdotterm=(epsdotx**2+epsdoty**2)*(tm**2 - t1*t2)/3
+    print('__epsdotterm: ',epsdotterm)
 
-    crossepsxa=-ps.e*(eta1+eta2) + ((4+5*ps.e+4*ps.e**2)/4)*gamma1\
-    -((2-ps.e+2*ps.e**2)/8)*gamma2 + (ps.e/12)*gamma3\
-    -(1+ps.e**2)*sigmahat1 + (ps.e/4)*sigmahat2
+    crossepsxa=((4-ps.e**2)/4)*gamma1+((1+2*ps.e**2)/8)*ps.e*gamma2-(ps.e**2/12)*gamma3\
+    -(1+ps.e**2)*sigmahat1 - (ps.e/4)*sigmahat2 - (3*ps.e/4)*(eta1+eta2)
     crossepsxb=(ps.e/2) - ((4+ps.e**2)/4)*sigma1 - (ps.e/8)*sigma2\
     +(ps.e**2/12)*sigma3 + gammahat1 - (ps.e/4)*gammahat2
 
-    crossepsx=nu*(pre)*((Omega**2)*crossepsxa + Kappa*np.sqrt(1-ps.e**2)*crossepsxb)
-    crossepsy=-nu*pre*np.cos(ps.vtheta)*np.sqrt(1-ps.e**2)*((ps.e/2) -
-                ((4+ps.e**2)/4)*sigma1 - (ps.e/8)*sigma2 +(ps.e**2/12)*sigma3 +
+    crossepsx=nu*(pre)*((Omega**2)*crossepsxa - Kappa*np.sqrt(1-ps.e**2)*crossepsxb)
+    crossepsy=-nu*pre*np.cos(ps.vtheta)*np.sqrt(1-ps.e**2)*((ps.e/2)
+                -((4+ps.e**2)/4)*sigma1 - (ps.e/8)*sigma2 +(ps.e**2/12)*sigma3 +
                 gammahat1 -(ps.e/4)*gammahat2)
 
-    av_epsepscx=(eps1x+mucx*(tperi-t1))*epsx\
-    +(ps.period/(2*np.pi))*mucx*crossepsx
-    av_epsepscy=(eps1y+mucy*(tperi-t1))*epsy\
-    +(ps.period/(2*np.pi))*mucy*crossepsy
+    crossepstermx=(tperi-tm)*epsx + (ps.period/(2*np.pi))*crossepsx
+    crossepstermy=(tperi-tm)*epsy + (ps.period/(2*np.pi))*crossepsy
+    crossepsdotterm=-2*np.abs(crossepstermx*epsdotx + crossepstermy*epsdoty)
 
-    av_epsepsc=av_epsepscx+av_epsepscy
-    aveps_avepsc=epsx*epscx + epsy*epscy
+    print('__crossepsdotterm: ',crossepsdotterm)
 
-    print('_av_epssq: ',av_epssq)
-    print('_aveps_sq: ',aveps_sq)
-    print('_av_epscsq: ',av_epscsq)
-    print('_avepsc_sq: ',avepsc_sq)
-    print('crossepsx: ',crossepsx)
-    print('crossepsy: ',crossepsy)
-    print('_av_epsepscx: ',av_epsepscx)
-    print('_av_epsepscy: ',av_epsepscy)
-    print('_av_epsepsc: ',av_epsepsc)
-    print('_aveps_avepsc: ',aveps_avepsc)
-
-    print('old terms: ',av_epssq-aveps_sq)
-    print('cross terms: ',-2*(av_epsepsc-aveps_avepsc))
-    print('c terms: ',av_epscsq-avepsc_sq)
-
-    return (2/np.pi)*np.sqrt(av_epssq-aveps_sq+av_epscsq-avepsc_sq-2*(av_epsepsc-aveps_avepsc))
+    dtheta=np.sqrt(av_epssq - aveps_sq + epsdotterm + crossepsdotterm)
+    if return_pm==True:
+        return dtheta, epsdotx, epsdoty
+    else:
+        return dtheta
 
 def dtheta_old(ps, t1, t2):
     # assuming ~uniform sampling in time between t1 and t2
@@ -532,16 +510,11 @@ def dtheta_old(ps, t1, t2):
 
     # using latest periapse time before t1
     tperi=ps.tperi+ps.period*int((t1-ps.tperi)/ps.period)
-    print('__tperi: ',tperi)
-    print('__t1: ',t1)
-    print('__t2: ',t2)
     # findEtas always(?) returns values betwen 0 and 2*pi
     # for most uses this is what we want (eta mostly appears in trig.)
     # here however we don't want to lose fators of 2*pi
     eta1=eta1 # between 0 and 2 pi
     eta2=eta2+2*np.pi*int((t2-tperi)/ps.period)
-    print('__eta1: ',eta1/np.pi)
-    print('__eta2: ',eta2/np.pi)
 
     sigma1, sigma2, sigma3, gamma1, gamma2, gamma3 = sigmagamma(eta1, eta2)
     sigmahat1, sigmahat2, gammahat1, gammahat2 = sigmagammahat(eta1, eta2)
@@ -578,6 +551,41 @@ def dtheta_old(ps, t1, t2):
     aveps_sq=epsx**2 + epsy**2
 
     return np.sqrt(av_epssq-aveps_sq)
+
+def radial_velocity(ps,ts,source='c'):
+    # are we seeing the radial veloicty of the photocenter (combined)
+    # or of the primary or secondary?
+    if (source=='c') or (source=='combined'):
+        Delta=(ps.q-ps.l)/((1+ps.q)*(1+ps.l))
+    elif (source=='p') or (source=='primary'):
+        Delta=q/(1+ps.q)
+    elif (source=='s') or (source=='secondary'):
+        Delta=-1/(1+ps.q)
+    etas=find_etas(ts,ps.period,ps.e,tPeri=ps.tperi)
+    bracket=(np.cos(ps.vphi)*np.sin(etas) -
+     np.sqrt(1-ps.e**2)*np.sin(ps.vphi)*np.cos(etas))/(1-ps.e*np.cos(etas))
+     # expect a in AU and period in years, convert to ms-1
+    unitconv=((1.0*u.AU).to(u.m).value)/((1.0*u.yr).to(u.s).value)
+    return unitconv*(2*np.pi*ps.period/ps.a)*Delta*np.sin(ps.vtheta)*bracket
+
+def seperation(ps,ts,phis=None):
+    # seperation of two sources in a binary, using scan angle if supplied
+    Omega = np.sqrt(1-(np.cos(ps.vphi)**2) * (np.sin(ps.vtheta)**2))
+    Kappa = np.sin(ps.vphi)*np.cos(ps.vphi)*(np.sin(ps.vtheta)**2)
+
+    pre = ps.parallax*ps.a/Omega
+
+    etas = findEtas(ts, ps.period, ps.e, tPeri=ps.tperi)
+    epsx=pre*((Omega**2)*(np.cos(etas)-ps.e) - Kappa*np.sqrt(1-ps.e**2)*np.sin(etas))
+    epsy=pre*np.cos(ps.vtheta)*np.sqrt(1-ps.e**2)*np.sin(etas)
+
+    dracs=epsx*np.cos(ps.vomega)-epsy*np.sin(ps.vomega)
+    ddecs=epsy*np.cos(ps.vomega)+epsx*np.sin(ps.vomega)
+
+    if phis==None:
+        return np.sqrt(dracs**2 + ddecs**2)
+    else:
+        return dracs*np.sin(phis) + ddecs*np.cos(phis)
 
 
 # ----------------------
