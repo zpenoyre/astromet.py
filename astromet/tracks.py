@@ -78,7 +78,7 @@ def totalmass(ps):
     return ps.totalmass
 
 def Delta(ps):
-    ps.Delta = np.abs(ps.q-ps.l)/((1+ps.q)*(1+ps.l))
+    ps.Delta = (ps.q-ps.l)/((1+ps.q)*(1+ps.l))
     return ps.Delta
 
 def track(ts, ps, comOnly=False, allComponents=False):
@@ -423,13 +423,146 @@ def dtheta_full(ps, t1, t2, return_pm=False):
     eta2 = findEtas(t2, ps.period, ps.e, tPeri=ps.tperi)
 
     # using latest periapse time before t1
-    tperi=ps.tperi+ps.period*int(1+(t1-ps.tperi)/ps.period)
+    tperi=ps.tperi+ps.period*np.floor((t1-ps.tperi)/ps.period)
     tm=(t1+t2)/2
     # findEtas always(?) returns values betwen 0 and 2*pi
     # for most uses this is what we want (eta mostly appears in trig.)
     # here however we don't want to lose fators of 2*pi
+    print('\n__t1: ',t1,' t2: ',t2,' ps.tperi: ',ps.tperi,' tperi: ',tperi)
+    print('eta1: ',eta1,' eta2: ',eta2)
     eta1=eta1 # between 0 and 2 pi
-    eta2=eta2+2*np.pi*int((t2-tperi)/ps.period)
+    eta2=eta2+2*np.pi*np.floor((t2-tperi)/ps.period)
+    print('eta1: ',eta1,' eta2: ',eta2,'\n')
+
+    sigma1, sigma2, sigma3, gamma1, gamma2, gamma3 = sigmagamma(eta1, eta2)
+    sigmahat1, sigmahat2, gammahat1, gammahat2 = sigmagammahat(eta1, eta2)
+
+    nu = 1/(1-ps.e*sigma1)
+
+    av_s=nu*(-gamma1+(ps.e/4)*gamma2)
+    av_c=nu*(-(ps.e/2)+sigma1-(ps.e/4)*sigma2)
+    av_s2=nu*((1/2)-(ps.e/4)*sigma1-(1/4)*sigma2+(ps.e/12)*sigma3)
+    av_sc=nu*((ps.e/4)*gamma1-(1/4)*gamma2+(ps.e/12)*gamma3)
+    av_c2=nu*((1/2)-(3*ps.e/4)*sigma1+(1/4)*sigma2-(ps.e/12)*sigma3)
+    av_etas=nu*(sigma1-(ps.e/8)*sigma2-gammahat1+(ps.e/4)*gammahat2)
+    av_etac=nu*(gamma1-(ps.e/8)*gamma2-(ps.e/4)*(eta1+eta2)+sigmahat1-(ps.e/4)*sigmahat2)
+
+    Omega = np.sqrt(1-(np.cos(ps.vphi)**2) * (np.sin(ps.vtheta)**2))
+    Kappa = np.sin(ps.vphi)*np.cos(ps.vphi)*(np.sin(ps.vtheta)**2)
+
+    pre = ps.parallax*ps.Delta*ps.a/Omega
+
+    #epsx1 = (1+ps.e**2)*sigma1 - ps.e*(1.5 + sigma2/4)
+    #epsxa = -(3*ps.e/2) + (1+ps.e**2)*sigma1 - (ps.e/4)*sigma2
+    #epsxb = gamma1-(ps.e/4)*gamma2
+    epsx = pre*((Omega**2)*(av_c-ps.e) - Kappa*np.sqrt(1-ps.e**2)*av_s)
+    epsy = pre*np.cos(ps.vtheta)*np.sqrt(1-ps.e**2)*av_s
+
+    print('analytical epsx: ',epsx,' and epsy: ',epsy)
+
+    #epsxsq1 = (1+2*ps.e**2)*(0.5+sigma2/4)-ps.e*(2+ps.e**2)*sigma1
+    #-ps.e*(3*sigma1/4 + sigma3/12)+ps.e**2
+    #epsxsqa = ((1+4*ps.e**2)/2)-((11+4*ps.e**2)/4)*ps.e*sigma1\
+    #+((1+2*ps.e**2)/4)*sigma2 - (ps.e/12)*sigma3
+    #epsxsq2 = (1+ps.e**2)*(gamma2/4)-ps.e*gamma1-ps.e*(gamma1/4 + gamma3/12)
+    #epsxsqb = (5*ps.e/4)*gamma1 - ((1+ps.e**2)/4)*gamma2 + (ps.e/12)*gamma3
+    #epsxsq3 = 0.5-sigma2/4-ps.e*(sigma1/4 - sigma3/12)
+    #epsxsqc = (1/2) - (ps.e/4)*sigma1 - (1/4)*sigma2 + (ps.e/12)*sigma3
+    epsxsq = (pre**2)*((Omega**4)*(av_c2 -2*ps.e*av_c +ps.e**2)\
+        - 2*(Omega**2)*Kappa*np.sqrt(1-ps.e**2)*(av_sc-ps.e*av_s)\
+        + (Kappa**2)*(1-ps.e**2)*av_s2)
+
+    epsysq = (pre**2)*(np.cos(ps.vtheta)**2)*(1-ps.e**2)*av_s2
+
+    av_epssq=epsxsq+epsysq
+    aveps_sq=epsx**2 + epsy**2
+
+    print('analytical eps2: ',epsxsq+epsysq)
+    print('analytical dtheta2 old: ',epsxsq+epsysq-(epsx**2 + epsy**2))
+
+    '''crossepsa=((4-(ps.e**2))/4)*gamma1+(ps.e/8)*gamma2-((ps.e**2)/12)*gamma3\
+        +(1+(ps.e**2))*sigmahat1 - (ps.e/4)*sigmahat2 - (3*ps.e/4)*(eta1+eta2)
+    print('old crossepsa: ',crossepsa)
+    crossepsb=(ps.e/2) - ((4+ps.e**2)/4)*sigma1 - (ps.e/8)*sigma2\
+        +(ps.e**2/12)*sigma3 + gammahat1 - (ps.e/4)*gammahat2
+
+    av_t_c=(tperi-tm)*(-(ps.e/2)+sigma1-(ps.e/4)*sigma2)+(ps.period/(2*np.pi))*crossepsa
+    av_t_s=(tperi-tm)*(-gamma1+(ps.e/4)*gamma2)+(ps.period/(2*np.pi))*crossepsb
+    print('old av_t_s: ',av_t_s)
+    print('old av_t_c: ',av_t_c)'''
+    av_t_s=(tperi-tm)*av_s+(ps.period/(2*np.pi))*(av_etas-ps.e*av_s2)
+    av_t_c=(tperi-tm)*av_c+(ps.period/(2*np.pi))*(av_etac-ps.e*av_sc)
+    print('av_t_s: ',av_t_s)
+    print('av_t_c: ',av_t_c)
+
+    crossepsx=pre*((Omega**2)*av_t_c - Kappa*np.sqrt(1-ps.e**2)*av_t_s)
+    crossepsy=pre*np.cos(ps.vtheta)*np.sqrt(1-ps.e**2)*av_t_s
+
+    print('analytical av eta eps: ',crossepsx,crossepsy)
+
+    eps1x=pre*((Omega**2)*(np.cos(eta1)-ps.e) - Kappa*np.sqrt(1-ps.e**2)*np.sin(eta1))
+    eps2x=pre*((Omega**2)*(np.cos(eta2)-ps.e) - Kappa*np.sqrt(1-ps.e**2)*np.sin(eta2))
+    #epscx=(eps1x+eps2x)/2
+
+    eps1y=pre*np.cos(ps.vtheta)*np.sqrt(1-ps.e**2)*np.sin(eta1)
+    eps2y=pre*np.cos(ps.vtheta)*np.sqrt(1-ps.e**2)*np.sin(eta2)
+
+    epsdotx=(eps2x-eps1x)/(t2-t1)
+    epsdoty=(eps2y-eps1y)/(t2-t1)
+    print('old epsdot: ',epsdotx,epsdoty)
+    epsdotx=3*crossepsx/(tm**2 - t1*t2)
+    epsdoty=3*crossepsy/(tm**2 - t1*t2)
+
+    print('analytical epsdot: ',epsdotx,epsdoty)
+    #print('analytical av epsc2: ',epsdotterm)
+
+    #crossepstermx=(tperi-tm)*epsx + (ps.period/(2*np.pi))*crossepsx
+    #crossepstermy=(tperi-tm)*epsy + (ps.period/(2*np.pi))*crossepsy
+    #print('analytical mux: ',3*crossepstermx/(tm**2 - t1*t2))
+    #print('analytical muy: ',3*crossepstermy/(tm**2 - t1*t2))
+    #print('analytical av (t-tm) eps: ',crossepstermx,crossepstermy)
+    #print('magnitude: ',np.sqrt(crossepstermx**2 + crossepstermy**2))
+    #crossepsdotterm=2*(crossepstermx*epsdotx + crossepstermy*epsdoty)
+    #print('analytical epsdotterm: ',epsdotterm)
+    #print('analytical crossepsdotterm: ',crossepsdotterm)
+
+
+    '''if ((epsdotterm-crossepsdotterm)>0):
+        print('term greater than 0')
+        print('__epsdotterm: ',epsdotterm)
+        print('__crossepsdotterm: ',crossepsdotterm)
+
+    if (-(epsdotterm-crossepsdotterm)>av_epssq - aveps_sq):
+        print('sqrt negative')
+        print('__epsdotterm: ',epsdotterm)
+        print('__crossepsdotterm: ',crossepsdotterm)'''
+
+    dtheta=np.sqrt(av_epssq - aveps_sq -3*(crossepsx**2 + crossepsy**2)/(tm**2 - t1*t2))
+    print('_analytic dtheta2 full: ',av_epssq - aveps_sq -3*(crossepsx**2 + crossepsy**2)/(tm**2 - t1*t2))
+    if return_pm==True:
+        return dtheta, epsdotx, epsdoty
+    else:
+        return dtheta
+
+def dtheta_wrong(ps, t1, t2, return_pm=False):
+    # assuming ~uniform sampling in time between t1 and t2
+    # and some known period
+    if ps.Delta == -1:
+        _ = Delta(ps)
+    eta1 = findEtas(t1, ps.period, ps.e, tPeri=ps.tperi)
+    eta2 = findEtas(t2, ps.period, ps.e, tPeri=ps.tperi)
+
+    # using latest periapse time before t1
+    tperi=ps.tperi+ps.period*np.floor((t1-ps.tperi)/ps.period)
+    tm=(t1+t2)/2
+    # findEtas always(?) returns values betwen 0 and 2*pi
+    # for most uses this is what we want (eta mostly appears in trig.)
+    # here however we don't want to lose fators of 2*pi
+    print('\n__t1: ',t1,' t2: ',t2,' ps.tperi: ',ps.tperi,' tperi: ',tperi)
+    print('eta1: ',eta1,' eta2: ',eta2)
+    eta1=eta1 # between 0 and 2 pi
+    eta2=eta2+2*np.pi*np.floor((t2-tperi)/ps.period)
+    print('eta1: ',eta1,' eta2: ',eta2,'\n')
 
     sigma1, sigma2, sigma3, gamma1, gamma2, gamma3 = sigmagamma(eta1, eta2)
     sigmahat1, sigmahat2, gammahat1, gammahat2 = sigmagammahat(eta1, eta2)
@@ -447,6 +580,8 @@ def dtheta_full(ps, t1, t2, return_pm=False):
 
     epsy = -nu*pre*np.cos(ps.vtheta)*np.sqrt(1-ps.e**2)*(gamma1-(ps.e/4)*gamma2)
 
+    print('analytical epsx: ',epsx,' and epsy: ',epsy)
+
     #epsxsq1 = (1+2*ps.e**2)*(0.5+sigma2/4)-ps.e*(2+ps.e**2)*sigma1
     #-ps.e*(3*sigma1/4 + sigma3/12)+ps.e**2
     epsxsqa = ((1+4*ps.e**2)/2)-((11+4*ps.e**2)/4)*ps.e*sigma1\
@@ -456,7 +591,7 @@ def dtheta_full(ps, t1, t2, return_pm=False):
     #epsxsq3 = 0.5-sigma2/4-ps.e*(sigma1/4 - sigma3/12)
     epsxsqc = (1/2) - (ps.e/4)*sigma1 - (1/4)*sigma2 + (ps.e/12)*sigma3
     epsxsq = nu*(pre**2)*((Omega**4)*epsxsqa
-                          + 2*(Omega**2)*Kappa*np.sqrt(1-ps.e**2)*epsxsqb
+                          - 2*(Omega**2)*Kappa*np.sqrt(1-ps.e**2)*epsxsqb
                           + (Kappa**2)*(1-ps.e**2)*epsxsqc)
 
     epsysq = nu*(pre**2)*(np.cos(ps.vtheta)**2)*(1-ps.e**2)*\
@@ -464,6 +599,9 @@ def dtheta_full(ps, t1, t2, return_pm=False):
 
     av_epssq=epsxsq+epsysq
     aveps_sq=epsx**2 + epsy**2
+
+    print('analytical eps2: ',epsxsq+epsysq)
+    print('analytical dtheta2 old: ',epsxsq+epsysq-(epsx**2 + epsy**2))
 
     eps1x=pre*((Omega**2)*(np.cos(eta1)-ps.e) - Kappa*np.sqrt(1-ps.e**2)*np.sin(eta1))
     eps2x=pre*((Omega**2)*(np.cos(eta2)-ps.e) - Kappa*np.sqrt(1-ps.e**2)*np.sin(eta2))
@@ -476,25 +614,43 @@ def dtheta_full(ps, t1, t2, return_pm=False):
     epsdoty=(eps2y-eps1y)/(t2-t1)
 
     epsdotterm=(epsdotx**2+epsdoty**2)*(tm**2 - t1*t2)/3
-    print('__epsdotterm: ',epsdotterm)
 
-    crossepsxa=((4-ps.e**2)/4)*gamma1+((1+2*ps.e**2)/8)*ps.e*gamma2-(ps.e**2/12)*gamma3\
-    -(1+ps.e**2)*sigmahat1 - (ps.e/4)*sigmahat2 - (3*ps.e/4)*(eta1+eta2)
+    print('analytical epsdot: ',epsdotx,epsdoty)
+    print('analytical av epsc2: ',epsdotterm)
+
+    crossepsxa=((4-(ps.e**2))/4)*gamma1+((1+2*(ps.e**2))/8)*ps.e*gamma2-((ps.e**2)/12)*gamma3\
+        +(1+(ps.e**2))*sigmahat1 - (ps.e/4)*sigmahat2 - (3*ps.e/4)*(eta1+eta2)
     crossepsxb=(ps.e/2) - ((4+ps.e**2)/4)*sigma1 - (ps.e/8)*sigma2\
-    +(ps.e**2/12)*sigma3 + gammahat1 - (ps.e/4)*gammahat2
+        +(ps.e**2/12)*sigma3 + gammahat1 - (ps.e/4)*gammahat2
 
-    crossepsx=nu*(pre)*((Omega**2)*crossepsxa - Kappa*np.sqrt(1-ps.e**2)*crossepsxb)
+    crossepsx=nu*(pre)*((Omega**2)*crossepsxa + Kappa*np.sqrt(1-ps.e**2)*crossepsxb)
     crossepsy=-nu*pre*np.cos(ps.vtheta)*np.sqrt(1-ps.e**2)*((ps.e/2)
-                -((4+ps.e**2)/4)*sigma1 - (ps.e/8)*sigma2 +(ps.e**2/12)*sigma3 +
-                gammahat1 -(ps.e/4)*gammahat2)
-
+                -((4+ps.e**2)/4)*sigma1 - (ps.e/8)*sigma2 +(ps.e**2/12)*sigma3
+                +gammahat1 -(ps.e/4)*gammahat2)
+    print('analytical av eta eps: ',crossepsx,crossepsy)
     crossepstermx=(tperi-tm)*epsx + (ps.period/(2*np.pi))*crossepsx
     crossepstermy=(tperi-tm)*epsy + (ps.period/(2*np.pi))*crossepsy
-    crossepsdotterm=-2*np.abs(crossepstermx*epsdotx + crossepstermy*epsdoty)
+    print('analytical mux: ',3*crossepstermx/(tm**2 - t1*t2))
+    print('analytical muy: ',3*crossepstermy/(tm**2 - t1*t2))
+    print('analytical av (t-tm) eps: ',crossepstermx,crossepstermy)
+    print('magnitude: ',np.sqrt(crossepstermx**2 + crossepstermy**2))
+    crossepsdotterm=2*(crossepstermx*epsdotx + crossepstermy*epsdoty)
+    print('analytical epsdotterm: ',epsdotterm)
+    print('analytical crossepsdotterm: ',crossepsdotterm)
 
-    print('__crossepsdotterm: ',crossepsdotterm)
 
-    dtheta=np.sqrt(av_epssq - aveps_sq + epsdotterm + crossepsdotterm)
+    '''if ((epsdotterm-crossepsdotterm)>0):
+        print('term greater than 0')
+        print('__epsdotterm: ',epsdotterm)
+        print('__crossepsdotterm: ',crossepsdotterm)
+
+    if (-(epsdotterm-crossepsdotterm)>av_epssq - aveps_sq):
+        print('sqrt negative')
+        print('__epsdotterm: ',epsdotterm)
+        print('__crossepsdotterm: ',crossepsdotterm)'''
+
+    dtheta=np.sqrt(av_epssq - aveps_sq + epsdotterm - crossepsdotterm)
+    print('_analytic dtheta2 full: ',av_epssq - aveps_sq + epsdotterm - crossepsdotterm)
     if return_pm==True:
         return dtheta, epsdotx, epsdoty
     else:
@@ -509,12 +665,12 @@ def dtheta_old(ps, t1, t2):
     eta2 = findEtas(t2, ps.period, ps.e, tPeri=ps.tperi)
 
     # using latest periapse time before t1
-    tperi=ps.tperi+ps.period*int((t1-ps.tperi)/ps.period)
+    tperi=ps.tperi+ps.period*np.floor((t1-ps.tperi)/ps.period)
     # findEtas always(?) returns values betwen 0 and 2*pi
     # for most uses this is what we want (eta mostly appears in trig.)
     # here however we don't want to lose fators of 2*pi
     eta1=eta1 # between 0 and 2 pi
-    eta2=eta2+2*np.pi*int((t2-tperi)/ps.period)
+    eta2=eta2+2*np.pi*np.floor((t2-tperi)/ps.period)
 
     sigma1, sigma2, sigma3, gamma1, gamma2, gamma3 = sigmagamma(eta1, eta2)
     sigmahat1, sigmahat2, gammahat1, gammahat2 = sigmagammahat(eta1, eta2)
@@ -541,7 +697,7 @@ def dtheta_old(ps, t1, t2):
     #epsxsq3 = 0.5-sigma2/4-ps.e*(sigma1/4 - sigma3/12)
     epsxsqc = (1/2) - (ps.e/4)*sigma1 - (1/4)*sigma2 + (ps.e/12)*sigma3
     epsxsq = nu*(pre**2)*((Omega**4)*epsxsqa
-                          + 2*(Omega**2)*Kappa*np.sqrt(1-ps.e**2)*epsxsqb
+                          - 2*(Omega**2)*Kappa*np.sqrt(1-ps.e**2)*epsxsqb
                           + (Kappa**2)*(1-ps.e**2)*epsxsqc)
 
     epsysq = nu*(pre**2)*(np.cos(ps.vtheta)**2)*(1-ps.e**2)*\
@@ -552,23 +708,27 @@ def dtheta_old(ps, t1, t2):
 
     return np.sqrt(av_epssq-aveps_sq)
 
-def radial_velocity(ps,ts,source='c'):
+def radial_velocity(ts,ps,source='c'):
     # are we seeing the radial veloicty of the photocenter (combined)
     # or of the primary or secondary?
+    if ps.a==0:
+        return np.zeros(ts.size)
     if (source=='c') or (source=='combined'):
         Delta=(ps.q-ps.l)/((1+ps.q)*(1+ps.l))
     elif (source=='p') or (source=='primary'):
-        Delta=q/(1+ps.q)
+        Delta=ps.q/(1+ps.q)
     elif (source=='s') or (source=='secondary'):
         Delta=-1/(1+ps.q)
-    etas=find_etas(ts,ps.period,ps.e,tPeri=ps.tperi)
+    etas=findEtas(ts,ps.period,ps.e,tPeri=ps.tperi)
     bracket=(np.cos(ps.vphi)*np.sin(etas) -
      np.sqrt(1-ps.e**2)*np.sin(ps.vphi)*np.cos(etas))/(1-ps.e*np.cos(etas))
      # expect a in AU and period in years, convert to ms-1
     unitconv=((1.0*u.AU).to(u.m).value)/((1.0*u.yr).to(u.s).value)
-    return unitconv*(2*np.pi*ps.period/ps.a)*Delta*np.sin(ps.vtheta)*bracket
+    return unitconv*(2*np.pi*ps.a/ps.period)*Delta*np.sin(ps.vtheta)*bracket
 
-def seperation(ps,ts,phis=None):
+def seperation(ts,ps,phis=None):
+    if ps.a==0:
+        return np.zeros(ts.size)
     # seperation of two sources in a binary, using scan angle if supplied
     Omega = np.sqrt(1-(np.cos(ps.vphi)**2) * (np.sin(ps.vtheta)**2))
     Kappa = np.sin(ps.vphi)*np.cos(ps.vphi)*(np.sin(ps.vtheta)**2)
@@ -582,7 +742,7 @@ def seperation(ps,ts,phis=None):
     dracs=epsx*np.cos(ps.vomega)-epsy*np.sin(ps.vomega)
     ddecs=epsy*np.cos(ps.vomega)+epsx*np.sin(ps.vomega)
 
-    if phis==None:
+    if phis is not None:
         return np.sqrt(dracs**2 + ddecs**2)
     else:
         return dracs*np.sin(phis) + ddecs*np.cos(phis)
@@ -596,9 +756,9 @@ def seperation(ps,ts,phis=None):
 def viewing_angles(la,i,ap):
     """Converts conentional orbital elements to our coordinate system
     Args:
-        long_asc (radians): Longitude of ascending node
-        incl (radians): Inclination
-        arg_peri (radians): Periastron argument
+        la (radians): Longitude of ascending node
+        i (radians): Inclination
+        ap (radians): Periastron argument
     Returns:
         vtheta (radians): polar viewing angle
         vphi (radians): azimuthal viewing angle
