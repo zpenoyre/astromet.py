@@ -428,11 +428,11 @@ def dtheta_full(ps, t1, t2, return_pm=False):
     # findEtas always(?) returns values betwen 0 and 2*pi
     # for most uses this is what we want (eta mostly appears in trig.)
     # here however we don't want to lose fators of 2*pi
-    print('\n__t1: ',t1,' t2: ',t2,' ps.tperi: ',ps.tperi,' tperi: ',tperi)
-    print('eta1: ',eta1,' eta2: ',eta2)
+    ##print('\n__t1: ',t1,' t2: ',t2,' ps.tperi: ',ps.tperi,' tperi: ',tperi)
+    ##print('eta1: ',eta1,' eta2: ',eta2)
     eta1=eta1 # between 0 and 2 pi
     eta2=eta2+2*np.pi*np.floor((t2-tperi)/ps.period)
-    print('eta1: ',eta1,' eta2: ',eta2,'\n')
+    ##print('eta1: ',eta1,' eta2: ',eta2,'\n')
 
     sigma1, sigma2, sigma3, gamma1, gamma2, gamma3 = sigmagamma(eta1, eta2)
     sigmahat1, sigmahat2, gammahat1, gammahat2 = sigmagammahat(eta1, eta2)
@@ -458,7 +458,7 @@ def dtheta_full(ps, t1, t2, return_pm=False):
     epsx = pre*((Omega**2)*(av_c-ps.e) - Kappa*np.sqrt(1-ps.e**2)*av_s)
     epsy = pre*np.cos(ps.vtheta)*np.sqrt(1-ps.e**2)*av_s
 
-    print('analytical epsx: ',epsx,' and epsy: ',epsy)
+    ##print('analytical epsx: ',epsx,' and epsy: ',epsy)
 
     #epsxsq1 = (1+2*ps.e**2)*(0.5+sigma2/4)-ps.e*(2+ps.e**2)*sigma1
     #-ps.e*(3*sigma1/4 + sigma3/12)+ps.e**2
@@ -477,8 +477,8 @@ def dtheta_full(ps, t1, t2, return_pm=False):
     av_epssq=epsxsq+epsysq
     aveps_sq=epsx**2 + epsy**2
 
-    print('analytical eps2: ',epsxsq+epsysq)
-    print('analytical dtheta2 old: ',epsxsq+epsysq-(epsx**2 + epsy**2))
+    ##print('analytical eps2: ',epsxsq+epsysq)
+    ##print('analytical dtheta2 old: ',epsxsq+epsysq-(epsx**2 + epsy**2))
 
     '''crossepsa=((4-(ps.e**2))/4)*gamma1+(ps.e/8)*gamma2-((ps.e**2)/12)*gamma3\
         +(1+(ps.e**2))*sigmahat1 - (ps.e/4)*sigmahat2 - (3*ps.e/4)*(eta1+eta2)
@@ -492,13 +492,13 @@ def dtheta_full(ps, t1, t2, return_pm=False):
     print('old av_t_c: ',av_t_c)'''
     av_t_s=(tperi-tm)*av_s+(ps.period/(2*np.pi))*(av_etas-ps.e*av_s2)
     av_t_c=(tperi-tm)*av_c+(ps.period/(2*np.pi))*(av_etac-ps.e*av_sc)
-    print('av_t_s: ',av_t_s)
-    print('av_t_c: ',av_t_c)
+    ##print('av_t_s: ',av_t_s)
+    ##print('av_t_c: ',av_t_c)
 
     crossepsx=pre*((Omega**2)*av_t_c - Kappa*np.sqrt(1-ps.e**2)*av_t_s)
     crossepsy=pre*np.cos(ps.vtheta)*np.sqrt(1-ps.e**2)*av_t_s
 
-    print('analytical av eta eps: ',crossepsx,crossepsy)
+    ##print('analytical av eta eps: ',crossepsx,crossepsy)
 
     eps1x=pre*((Omega**2)*(np.cos(eta1)-ps.e) - Kappa*np.sqrt(1-ps.e**2)*np.sin(eta1))
     eps2x=pre*((Omega**2)*(np.cos(eta2)-ps.e) - Kappa*np.sqrt(1-ps.e**2)*np.sin(eta2))
@@ -509,11 +509,11 @@ def dtheta_full(ps, t1, t2, return_pm=False):
 
     epsdotx=(eps2x-eps1x)/(t2-t1)
     epsdoty=(eps2y-eps1y)/(t2-t1)
-    print('old epsdot: ',epsdotx,epsdoty)
+    ##print('old epsdot: ',epsdotx,epsdoty)
     epsdotx=3*crossepsx/(tm**2 - t1*t2)
     epsdoty=3*crossepsy/(tm**2 - t1*t2)
 
-    print('analytical epsdot: ',epsdotx,epsdoty)
+    ##print('analytical epsdot: ',epsdotx,epsdoty)
     #print('analytical av epsc2: ',epsdotterm)
 
     #crossepstermx=(tperi-tm)*epsx + (ps.period/(2*np.pi))*crossepsx
@@ -538,7 +538,7 @@ def dtheta_full(ps, t1, t2, return_pm=False):
         print('__crossepsdotterm: ',crossepsdotterm)'''
 
     dtheta=np.sqrt(av_epssq - aveps_sq -3*(crossepsx**2 + crossepsy**2)/(tm**2 - t1*t2))
-    print('_analytic dtheta2 full: ',av_epssq - aveps_sq -3*(crossepsx**2 + crossepsy**2)/(tm**2 - t1*t2))
+    ##print('_analytic dtheta2 full: ',av_epssq - aveps_sq -3*(crossepsx**2 + crossepsy**2)/(tm**2 - t1*t2))
     if return_pm==True:
         return dtheta, epsdotx, epsdoty
     else:
@@ -558,11 +558,11 @@ def dtheta_wrong(ps, t1, t2, return_pm=False):
     # findEtas always(?) returns values betwen 0 and 2*pi
     # for most uses this is what we want (eta mostly appears in trig.)
     # here however we don't want to lose fators of 2*pi
-    print('\n__t1: ',t1,' t2: ',t2,' ps.tperi: ',ps.tperi,' tperi: ',tperi)
-    print('eta1: ',eta1,' eta2: ',eta2)
+    ##print('\n__t1: ',t1,' t2: ',t2,' ps.tperi: ',ps.tperi,' tperi: ',tperi)
+    ##print('eta1: ',eta1,' eta2: ',eta2)
     eta1=eta1 # between 0 and 2 pi
     eta2=eta2+2*np.pi*np.floor((t2-tperi)/ps.period)
-    print('eta1: ',eta1,' eta2: ',eta2,'\n')
+    ##print('eta1: ',eta1,' eta2: ',eta2,'\n')
 
     sigma1, sigma2, sigma3, gamma1, gamma2, gamma3 = sigmagamma(eta1, eta2)
     sigmahat1, sigmahat2, gammahat1, gammahat2 = sigmagammahat(eta1, eta2)
@@ -580,7 +580,7 @@ def dtheta_wrong(ps, t1, t2, return_pm=False):
 
     epsy = -nu*pre*np.cos(ps.vtheta)*np.sqrt(1-ps.e**2)*(gamma1-(ps.e/4)*gamma2)
 
-    print('analytical epsx: ',epsx,' and epsy: ',epsy)
+    ##print('analytical epsx: ',epsx,' and epsy: ',epsy)
 
     #epsxsq1 = (1+2*ps.e**2)*(0.5+sigma2/4)-ps.e*(2+ps.e**2)*sigma1
     #-ps.e*(3*sigma1/4 + sigma3/12)+ps.e**2
@@ -600,8 +600,8 @@ def dtheta_wrong(ps, t1, t2, return_pm=False):
     av_epssq=epsxsq+epsysq
     aveps_sq=epsx**2 + epsy**2
 
-    print('analytical eps2: ',epsxsq+epsysq)
-    print('analytical dtheta2 old: ',epsxsq+epsysq-(epsx**2 + epsy**2))
+    ##print('analytical eps2: ',epsxsq+epsysq)
+    ##print('analytical dtheta2 old: ',epsxsq+epsysq-(epsx**2 + epsy**2))
 
     eps1x=pre*((Omega**2)*(np.cos(eta1)-ps.e) - Kappa*np.sqrt(1-ps.e**2)*np.sin(eta1))
     eps2x=pre*((Omega**2)*(np.cos(eta2)-ps.e) - Kappa*np.sqrt(1-ps.e**2)*np.sin(eta2))
@@ -615,8 +615,8 @@ def dtheta_wrong(ps, t1, t2, return_pm=False):
 
     epsdotterm=(epsdotx**2+epsdoty**2)*(tm**2 - t1*t2)/3
 
-    print('analytical epsdot: ',epsdotx,epsdoty)
-    print('analytical av epsc2: ',epsdotterm)
+    ##print('analytical epsdot: ',epsdotx,epsdoty)
+    ##print('analytical av epsc2: ',epsdotterm)
 
     crossepsxa=((4-(ps.e**2))/4)*gamma1+((1+2*(ps.e**2))/8)*ps.e*gamma2-((ps.e**2)/12)*gamma3\
         +(1+(ps.e**2))*sigmahat1 - (ps.e/4)*sigmahat2 - (3*ps.e/4)*(eta1+eta2)
@@ -627,16 +627,16 @@ def dtheta_wrong(ps, t1, t2, return_pm=False):
     crossepsy=-nu*pre*np.cos(ps.vtheta)*np.sqrt(1-ps.e**2)*((ps.e/2)
                 -((4+ps.e**2)/4)*sigma1 - (ps.e/8)*sigma2 +(ps.e**2/12)*sigma3
                 +gammahat1 -(ps.e/4)*gammahat2)
-    print('analytical av eta eps: ',crossepsx,crossepsy)
+    ##print('analytical av eta eps: ',crossepsx,crossepsy)
     crossepstermx=(tperi-tm)*epsx + (ps.period/(2*np.pi))*crossepsx
     crossepstermy=(tperi-tm)*epsy + (ps.period/(2*np.pi))*crossepsy
-    print('analytical mux: ',3*crossepstermx/(tm**2 - t1*t2))
-    print('analytical muy: ',3*crossepstermy/(tm**2 - t1*t2))
-    print('analytical av (t-tm) eps: ',crossepstermx,crossepstermy)
-    print('magnitude: ',np.sqrt(crossepstermx**2 + crossepstermy**2))
+    ##print('analytical mux: ',3*crossepstermx/(tm**2 - t1*t2))
+    ##print('analytical muy: ',3*crossepstermy/(tm**2 - t1*t2))
+    ##print('analytical av (t-tm) eps: ',crossepstermx,crossepstermy)
+    ##print('magnitude: ',np.sqrt(crossepstermx**2 + crossepstermy**2))
     crossepsdotterm=2*(crossepstermx*epsdotx + crossepstermy*epsdoty)
-    print('analytical epsdotterm: ',epsdotterm)
-    print('analytical crossepsdotterm: ',crossepsdotterm)
+    ##print('analytical epsdotterm: ',epsdotterm)
+    ##print('analytical crossepsdotterm: ',crossepsdotterm)
 
 
     '''if ((epsdotterm-crossepsdotterm)>0):
@@ -650,7 +650,7 @@ def dtheta_wrong(ps, t1, t2, return_pm=False):
         print('__crossepsdotterm: ',crossepsdotterm)'''
 
     dtheta=np.sqrt(av_epssq - aveps_sq + epsdotterm - crossepsdotterm)
-    print('_analytic dtheta2 full: ',av_epssq - aveps_sq + epsdotterm - crossepsdotterm)
+    ##print('_analytic dtheta2 full: ',av_epssq - aveps_sq + epsdotterm - crossepsdotterm)
     if return_pm==True:
         return dtheta, epsdotx, epsdoty
     else:

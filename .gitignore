@@ -7,4 +7,4 @@ astromet/*.egg-info
 dist
 build
 docs/_build/
-*Icon
+Icon\r\r
