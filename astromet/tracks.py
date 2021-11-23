@@ -229,7 +229,7 @@ def conditional_njit(backup=None):
     return decorator
 
 
-def findEta(ts, period, eccentricity, tPeri=0, N_it=10):
+def findEtas(ts, period, eccentricity, tPeri=0, N_it=10):
     if use_backup==True:
         etas = findEtas_backup(ts, period, eccentricity, tPeri=tPeri)
     else:
@@ -260,9 +260,6 @@ def findEtas_full(ts, period, eccentricity, tPeri=0, N_it=10):
 
     Slightly edited version of code taken from https://github.com/oliverphilcox/Keplers-Goat-Herd
     """
-    if use_backup == True:
-        return findEtas_backup(ts, period, eccentricity, tPeri=tPeri)
-
     ell_array = ((2*np.pi/period)*(ts-tPeri)) % (2.0*np.pi)
 
     # Check inputs
