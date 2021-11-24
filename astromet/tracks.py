@@ -61,6 +61,14 @@ class params():
         self.vphi = 45
         self.vomega = 0
         self.tperi = 0  # jyear
+        # lensing parameters
+        self.lensdrac = 0  # mas
+        self.lensddec = 0  # mas
+        self.lenspmrac = 0  # mas/year
+        self.lenspmdec = 0  # mas/year
+        self.lensparallax = 0  # mas
+        self.thetaE = 0  # mas
+        self.fbl0 = 1
 
         # Below are assumed to be derived from other params
         # (I.e. not(!) specified by user)
@@ -92,23 +100,44 @@ def Delta(ps):
 
 def track(ts, ps, comOnly=False, allComponents=False):
     """
-    Astrometric track in RAcos(Dec) and Dec [mas] for a given binary
+    Astrometric track in RAcos(Dec) and Dec [mas] for a given binary (or lensing event)
     Args:
         - ts,       ndarray - Observation times, jyear.
-        - ps,       params object - Astrometric and binary parameters.
+        - ps,       params object - Astrometric, binary and lensing parameters.
         - comOnly,  bool - If True return only c.o.m track (no binary)
         - allComponents,     bool - If True return pos. of c.o.l. & both components
     Returns:
         - racs      ndarry - RAcosDec at each time, mas
         - decs      ndarry - Dec at each time, mas
+        (optionally) - mag_diff     ndarray - difference from baseline magnitude at each time (for lensing events)
     """
     xij = design_matrix(ts, np.deg2rad(ps.ra), np.deg2rad(ps.dec), epoch=ps.epoch)
 
     r5d = np.array([ps.drac, ps.ddec, ps.parallax, ps.pmrac, ps.pmdec])
     dracs, ddecs = xij@r5d  # all in mas
 
+    if ps.thetaE > 0:
+        # track of the lens
+        r5d_lens = np.array([ps.lensdrac, ps.lensddec, ps.lensparallax, ps.lenspmrac, ps.lenspmdec])
+        dracs_lens, ddecs_lens = xij@r5d_lens  # all in mas
+        # track & amplification of the light center
+        dracs_img_rel, ddecs_img_rel, ampl = ulens(
+            dracs - dracs_lens, ddecs - ddecs_lens, ps.thetaE)
+        dracs_img, ddecs_img = dracs_img_rel + dracs_lens, ddecs_img_rel + ddecs_lens
+        mag_diff = -2.5*np.log10(ampl)
+        # blending if lens light is significant
+        if(ps.fbl0 < 1):
+            fbl = ampl/(ampl + (1-fbl0)/fbl0)
+            dracs_blended, ddecs_blended = blend(
+                dracs_img, ddecs_img, dracs_lens, ddecs_lens, fbl)
+            mag_diff = -2.5*np.log10(1+fbl0*(ampl-1))
+            return dracs_blended, ddecs_blended, mag_diff
+        else:
+            return dracs_img, ddecs_img, mag_diff
+
     if comOnly == True:
         return dracs, ddecs
+
     # extra c.o.l. correction due to binary
     px1s, py1s, px2s, py2s, pxls, pyls = binaryMotion(
         ts-ps.tperi, ps.period, ps.q, ps.l, ps.a, ps.e, ps.vtheta, ps.vphi)
@@ -770,6 +799,50 @@ def seperation(ts, ps, phis=None):
     else:
         return dracs*np.sin(phis) + ddecs*np.cos(phis)
 
+# ----------------------
+# -Lensing
+# ----------------------
+
+# lensing function - defined in the reference frame of the lens
+def ulens(ddec, drac, thetaE):
+
+    x = ddec/thetaE
+    y = drac/thetaE
+    u = np.sqrt(x**2+y**2)
+
+    ampl = (u**2 + 2)/(u*np.sqrt(u**2+4))
+
+    th_plus = 0.5 * (u + (u**2 + 4)**0.5)
+    th_minus = 0.5 * (u - (u**2 + 4)**0.5)
+
+    A_plus = (u**2+2)/(2*u*(u**2+4)**0.5) + 0.5
+    A_minus = A_plus - 1
+
+    ddec_plus, drac_plus = th_plus * ddec / u, th_plus * drac / u
+    ddec_minus, drac_minus = th_minus * ddec / u, th_minus * drac / u
+
+    ddec_centroid, drac_centroid = (ddec_plus*A_plus + ddec_minus*A_minus) / \
+        (A_plus + A_minus), (drac_plus*A_plus + drac_minus*A_minus)/(A_plus + A_minus)
+
+    return ddec_centroid, drac_centroid, ampl
+
+# blending
+def blend(drac_firstlight, ddec_firstlight, drac_blend, ddec_blend, fbl):
+    drac_blended, ddec_blended = drac_firstlight*fbl + drac_blend * \
+        (1-fbl), ddec_firstlight*fbl + ddec_blend*(1-fbl)
+    return drac_blended, ddec_blended
+
+# getting lensdrac, lensddec (offset from the source at the centred epoch) from lensing parameters
+def get_offset(params, u0, t0):
+    mu_rel = np.array([params.pmrac - params.lenspmrac,
+                      params.pmdec - params.lenspmdec])
+    offset_t0 = mu_rel*(t0-params.epoch)
+    offset_u0_dir = [mu_rel[1], -mu_rel[0]]
+    offset_u0 = offset_u0_dir/np.linalg.norm(offset_u0_dir) * \
+        u0*params.thetaE  # separation at t0
+    offset_mas = offset_t0 - offset_u0
+    params.lensdrac, params.lensddec = offset_mas[0], offset_mas[1]
+    return params
 
 # ----------------------
 # -Utilities
