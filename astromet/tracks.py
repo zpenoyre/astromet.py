@@ -68,7 +68,7 @@ class params():
         self.lenspmdec = 0  # mas/year
         self.lensparallax = 0  # mas
         self.thetaE = 0  # mas
-        self.fbl0 = 1
+        self.fbl = 1
 
         # Below are assumed to be derived from other params
         # (I.e. not(!) specified by user)
@@ -126,11 +126,11 @@ def track(ts, ps, comOnly=False, allComponents=False):
         dracs_img, ddecs_img = dracs_img_rel + dracs_lens, ddecs_img_rel + ddecs_lens
         mag_diff = -2.5*np.log10(ampl)
         # blending if lens light is significant
-        if(ps.fbl0 < 1):
-            fbl = ampl/(ampl + (1-fbl0)/fbl0)
+        if(ps.fbl < 1):
+            light_ratio = ampl/(ampl + (1-ps.fbl)/ps.fbl) # source light : total light
             dracs_blended, ddecs_blended = blend(
-                dracs_img, ddecs_img, dracs_lens, ddecs_lens, fbl)
-            mag_diff = -2.5*np.log10(1+fbl0*(ampl-1))
+                dracs_img, ddecs_img, dracs_lens, ddecs_lens, light_ratio)
+            mag_diff = -2.5*np.log10(1+ps.fbl*(ampl-1))
             return dracs_blended, ddecs_blended, mag_diff
         else:
             return dracs_img, ddecs_img, mag_diff
@@ -827,9 +827,9 @@ def ulens(ddec, drac, thetaE):
     return ddec_centroid, drac_centroid, ampl
 
 # blending
-def blend(drac_firstlight, ddec_firstlight, drac_blend, ddec_blend, fbl):
-    drac_blended, ddec_blended = drac_firstlight*fbl + drac_blend * \
-        (1-fbl), ddec_firstlight*fbl + ddec_blend*(1-fbl)
+def blend(drac_firstlight, ddec_firstlight, drac_blend, ddec_blend, lr):
+    drac_blended, ddec_blended = drac_firstlight*lr + drac_blend * \
+        (1-lr), ddec_firstlight*lr + ddec_blend*(1-lr)
     return drac_blended, ddec_blended
 
 # getting lensdrac, lensddec (offset from the source at the centred epoch) from lensing parameters
