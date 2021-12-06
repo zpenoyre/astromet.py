@@ -43,7 +43,7 @@ Let's start with a simple single body example:
     params.ddec=0     #[mas]
     params.pmrac=8    #[mas/yr]
     params.pmdec=-2   #[mas/yr]
-    params.parallax=5     #[mas]
+    params.parallax=1     #[mas]
 
 All we need now is some times at which we want to find the position
 ::
