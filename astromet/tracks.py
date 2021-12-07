@@ -28,6 +28,7 @@ tbegin = 2014.6670  # time (in years) of Gaia's first observations
 use_backup = True  # If set to true use simpler backup Kepler equation solver.
 
 # loads data needed to find astrometric error as functon of magnitude
+# data digitized from Lindegren+2020 fig A.1
 local_dir = os.path.dirname(__file__)  # <-- absolute dir the script is in
 rel_path = '/data/scatteral_edr3.csv'
 abs_file_path = local_dir+rel_path  # os.path.join(local_dir, rel_path)
