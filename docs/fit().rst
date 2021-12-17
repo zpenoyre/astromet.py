@@ -30,11 +30,11 @@ times and angles Gaia visited a patch of sky.
     import scanninglaw.times
     from scanninglaw.source import Source
 
+    dr3_sl=scanninglaw.times.Times(version='dr3_nominal') # slow step - run only once
+
     ra=160
     dec=-50
     c=Source(ra,dec,unit='deg')
-
-    dr3_sl=scanninglaw.times.dr2_sl(version='dr3_nominal') # slow step - run only once
     sl=dr3_sl(c, return_times=True, return_angles=True)
 
     ts=np.squeeze(np.hstack(sl['times']))

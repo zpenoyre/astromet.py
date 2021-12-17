@@ -43,7 +43,7 @@ Let's start with a simple single body example:
     params.ddec=0     #[mas]
     params.pmrac=8    #[mas/yr]
     params.pmdec=-2   #[mas/yr]
-    params.parallax=5     #[mas]
+    params.parallax=1     #[mas]
 
 All we need now is some times at which we want to find the position
 ::
@@ -242,7 +242,7 @@ to see how good both fits are:
     fitparams.ddec=results['ddec']+results['ddec_error']*np.random.randn()     #[mas]
     fitparams.pmrac=results['pmrac']+results['pmrac_error']*np.random.randn()    #[mas/yr]
     fitparams.pmdec=results['pmdec']+results['pmdec_error']*np.random.randn()   #[mas/yr]
-    fitparams.pllx=results['parallax']+results['parallax_error']*np.random.randn()     #[mas]
+    fitparams.parallax=results['parallax']+results['parallax_error']*np.random.randn()     #[mas]
 
     fitracs,fitdecs=astromet.track(plotts,fitparams)
     ax.plot(fitracs,fitdecs,c='blue',alpha=0.1)
@@ -253,7 +253,7 @@ to see how good both fits are:
     bfitparams.ddec=bresults['ddec']+bresults['ddec_error']*np.random.randn()     #[mas]
     bfitparams.pmrac=bresults['pmrac']+bresults['pmrac_error']*np.random.randn()    #[mas/yr]
     bfitparams.pmdec=bresults['pmdec']+bresults['pmdec_error']*np.random.randn()   #[mas/yr]
-    bfitparams.pllx=bresults['parallax']+bresults['parallax_error']*np.random.randn()     #[mas]
+    bfitparams.parallax=bresults['parallax']+bresults['parallax_error']*np.random.randn()     #[mas]
 
     bfitracs,bfitdecs=astromet.track(plotts,bfitparams)
     ax.plot(bfitracs,bfitdecs,c='orange',alpha=0.1)
