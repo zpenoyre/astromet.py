@@ -6,6 +6,7 @@ from astropy.time import Time
 import scipy.interpolate
 import sys
 import os
+from .lensing import *
 
 # Create units used elsewhere
 mSun = constants.M_sun.to(u.kg).value
@@ -117,41 +118,38 @@ def track(ts, ps, comOnly=False, allComponents=False):
     r5d = np.array([ps.drac, ps.ddec, ps.parallax, ps.pmrac, ps.pmdec])
     dracs, ddecs = xij@r5d  # all in mas
 
-    if ps.thetaE > 0:
-        # track of the lens
-        r5d_lens = np.array([ps.lensdrac, ps.lensddec, ps.lensparallax, ps.lenspmrac, ps.lenspmdec])
-        dracs_lens, ddecs_lens = xij@r5d_lens  # all in mas
-        # track & amplification of the light center
-        dracs_img_rel, ddecs_img_rel, ampl = ulens(
-            dracs - dracs_lens, ddecs - ddecs_lens, ps.thetaE)
-        dracs_img, ddecs_img = dracs_img_rel + dracs_lens, ddecs_img_rel + ddecs_lens
-        mag_diff = -2.5*np.log10(ampl)
-        # blending if lens light is significant
-        if(ps.fbl < 1):
-            light_ratio = ampl/(ampl + (1-ps.fbl)/ps.fbl) # source light : total light
-            dracs_blended, ddecs_blended = blend(
-                dracs_img, ddecs_img, dracs_lens, ddecs_lens, light_ratio)
-            mag_diff = -2.5*np.log10(1+ps.fbl*(ampl-1))
-            return dracs_blended, ddecs_blended, mag_diff
+    if comOnly == False:
+        # extra c.o.l. correction due to binary
+        px1s, py1s, px2s, py2s, pxls, pyls = binaryMotion(
+            ts-ps.tperi, ps.period, ps.q, ps.l, ps.a, ps.e, ps.vtheta, ps.vphi)
+        rls = ps.parallax*(pxls*np.cos(ps.vomega)+pyls*np.sin(ps.vomega))
+        dls = ps.parallax*(pyls*np.cos(ps.vomega)-pxls*np.sin(ps.vomega))
+        if allComponents == True: # returns all 3 components
+            r1s = ps.parallax*(px1s*np.cos(ps.vomega)+py1s*np.sin(ps.vomega))
+            d1s = ps.parallax*(py1s*np.cos(ps.vomega)-px1s*np.sin(ps.vomega))
+            r2s = ps.parallax*(px2s*np.cos(ps.vomega)+py2s*np.sin(ps.vomega))
+            d2s = ps.parallax*(py2s*np.cos(ps.vomega)-px2s*np.sin(ps.vomega))
+            return dracs+rls, ddecs+dls, dracs+r1s, ddecs+d1s, dracs+r2s, ddecs+d2s
         else:
-            return dracs_img, ddecs_img, mag_diff
+            dracs, ddecs = dracs+rls, ddecs+dls  # positions of the c.o.l. to be returned or passed to lensing/blending functions
 
-    if comOnly == True:
-        return dracs, ddecs
+    if ps.thetaE > 0: #lensing
+        # track of the lens
+        r5d_blend = np.array([ps.blenddrac, ps.blendddec, ps.blendparallax, ps.blendpmrac, ps.blendpmdec])
+        dracs_blend, ddecs_blend = xij@r5d_blend  # all in mas
+        dracs_lensed, ddecs_lensed, mag_diff = onsky_lens(dracs, ddecs, dracs_blend, ddecs_blend, ps.thetaE, ps.fbl)
+        return dracs_lensed, ddecs_lensed, mag_diff
 
-    # extra c.o.l. correction due to binary
-    px1s, py1s, px2s, py2s, pxls, pyls = binaryMotion(
-        ts-ps.tperi, ps.period, ps.q, ps.l, ps.a, ps.e, ps.vtheta, ps.vphi)
-    rls = ps.parallax*(pxls*np.cos(ps.vomega)+pyls*np.sin(ps.vomega))
-    dls = ps.parallax*(pyls*np.cos(ps.vomega)-pxls*np.sin(ps.vomega))
-    if allComponents == False:
-        return dracs+rls, ddecs+dls  # return just the position of the c.o.l.
-    else:  # returns all 3 components
-        r1s = ps.parallax*(px1s*np.cos(ps.vomega)+py1s*np.sin(ps.vomega))
-        d1s = ps.parallax*(py1s*np.cos(ps.vomega)-px1s*np.sin(ps.vomega))
-        r2s = ps.parallax*(px2s*np.cos(ps.vomega)+py2s*np.sin(ps.vomega))
-        d2s = ps.parallax*(py2s*np.cos(ps.vomega)-px2s*np.sin(ps.vomega))
-        return dracs+rls, ddecs+dls, dracs+r1s, ddecs+d1s, dracs+r2s, ddecs+d2s
+    else:
+        if(ps.fbl < 1): # blending
+            # track of the blend
+            r5d_blend = np.array([ps.blenddrac, ps.blendddec, ps.blendparallax, ps.blendpmrac, ps.blendpmdec])
+            dracs_blend, ddecs_blend = xij@r5d_blend  # all in mas
+            dracs_blended, ddecs_blended = blend(dracs, ddecs, dracs_blend, ddecs_blend, ps.fbl)
+            return dracs_blended, ddecs_blended
+
+    return dracs, ddecs
+
 
 # ----------------
 # -On-sky motion
@@ -799,51 +797,6 @@ def seperation(ts, ps, phis=None):
         return np.sqrt(dracs**2 + ddecs**2)
     else:
         return dracs*np.sin(phis) + ddecs*np.cos(phis)
-
-# ----------------------
-# -Lensing
-# ----------------------
-
-# lensing function - defined in the reference frame of the lens
-def ulens(ddec, drac, thetaE):
-
-    x = ddec/thetaE
-    y = drac/thetaE
-    u = np.sqrt(x**2+y**2)
-
-    ampl = (u**2 + 2)/(u*np.sqrt(u**2+4))
-
-    th_plus = 0.5 * (u + (u**2 + 4)**0.5)
-    th_minus = 0.5 * (u - (u**2 + 4)**0.5)
-
-    A_plus = (u**2+2)/(2*u*(u**2+4)**0.5) + 0.5
-    A_minus = A_plus - 1
-
-    ddec_plus, drac_plus = th_plus * ddec / u, th_plus * drac / u
-    ddec_minus, drac_minus = th_minus * ddec / u, th_minus * drac / u
-
-    ddec_centroid, drac_centroid = (ddec_plus*A_plus + ddec_minus*A_minus) / \
-        (A_plus + A_minus), (drac_plus*A_plus + drac_minus*A_minus)/(A_plus + A_minus)
-
-    return ddec_centroid, drac_centroid, ampl
-
-# blending
-def blend(drac_firstlight, ddec_firstlight, drac_blend, ddec_blend, lr):
-    drac_blended, ddec_blended = drac_firstlight*lr + drac_blend * \
-        (1-lr), ddec_firstlight*lr + ddec_blend*(1-lr)
-    return drac_blended, ddec_blended
-
-# getting lensdrac, lensddec (offset from the source at the centred epoch) from lensing parameters
-def get_offset(params, u0, t0):
-    mu_rel = np.array([params.pmrac - params.lenspmrac,
-                      params.pmdec - params.lenspmdec])
-    offset_t0 = mu_rel*(t0-params.epoch)
-    offset_u0_dir = [mu_rel[1], -mu_rel[0]]
-    offset_u0 = offset_u0_dir/np.linalg.norm(offset_u0_dir) * \
-        u0*params.thetaE  # separation at t0
-    offset_mas = offset_t0 - offset_u0
-    params.lensdrac, params.lensddec = offset_mas[0], offset_mas[1]
-    return params
 
 # ----------------------
 # -Utilities
