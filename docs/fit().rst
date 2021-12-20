@@ -37,9 +37,9 @@ times and angles Gaia visited a patch of sky.
     c=Source(ra,dec,unit='deg')
     sl=dr3_sl(c, return_times=True, return_angles=True)
 
-    ts=np.squeeze(np.hstack(sl['times']))
+    ts=2010+np.squeeze(np.hstack(sl['times']))/365.25
     sort=np.argsort(ts)
-    ts=2010+ts[sort]/365.25                         # [jyr]
+    ts=np.double(ts[sort])                          # [jyr]
     phis=np.squeeze(np.hstack(sl['angles']))[sort]  # [deg]
 
 which we can have a look at
