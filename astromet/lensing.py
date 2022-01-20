@@ -1,4 +1,5 @@
 import numpy as np
+import warnings
 
 # ----------------------
 # -Lensing
@@ -94,6 +95,74 @@ def get_offset(params, u0, t0):
     params.blenddrac, params.blendddec = offset_mas[0], offset_mas[1]
     return params
 
+def define_lens(u0, t0, tE, piEN, piEE, m0, fbl, pmrac_source, pmdec_source, d_source, thetaE):
+    """
+    Defines astromet parameters using standard microlensing parameters (u0, t0, tE, piEN, piEE, m0, fbl), kinematics of the source and thetaE.
+
+    Args:
+        (returned from a photometric model)
+        - u0            float - impact parameter - lens-source separation at closest approach in units of the angular Einstein radius
+        - t0            float - time of closest lens-source approach, reduced JD
+        - tE            float - timescale of the event, days
+        - piEN          float - local north component of the microlensing parallax vector (..)
+        - piEE          float - local east component of the microlensing parallax vector
+        - m0            float - magnitude at baseline, mag
+        - fbl           float - blending parameter (flux from the source / combined flux)
+        (assumed)
+        - pmrac_source          float - proper motion of the source in RAcosDec, mas/yr
+        - pmdec_source          float - proper motion of the source in DEC, mas/yr
+        - d_source            float - distance to the source, kpc
+        - thetaE        float - angular Einstein radius, mas
+    Returns:
+        - params        astromet parameters
+    """
+
+    # conversion to years
+    y = (1.0*u.year).to(u.day).value
+    t0 = Time(t0+2450000, format='jd').decimalyear
+    tE = tE/y
+
+    # relative motion
+    piE = np.sqrt(piEN**2 + piEE**2)
+    pi_rel = piE*thetaE
+
+    mu_rel = thetaE/tE
+    mu_rel_N = mu_rel*piEN/piE
+    mu_rel_E = mu_rel*piEE/piE
+
+    # lens motion
+    pmdec_lens = mu_rel_N + pmdec_source
+    pmrac_lens = mu_rel_E + pmrac_source
+
+    # parallaxes
+    pi_source = 1/d_source
+    pi_lens = pi_source + pi_rel
+
+    # astromet parameters
+    params=astromet.params()
+
+    params.ra=ra_event
+    params.dec=dec_event
+
+    # source motion
+    params.parallax=pi_source
+    params.pmrac=pmrac_source
+    params.pmdec=pmdec_source
+
+    # lens motion
+    params.blendparallax=pi_lens
+    params.blendpmrac=pmrac_lens
+    params.blendpmdec=pmdec_lens
+
+    # lensing event
+    params.thetaE=thetaE
+    params.fbl=fbl
+
+    # correct params to include source-lens offset
+    params = astromet.get_offset(params, u0, t0)
+
+    return params
+
 # ----------------------
 # -Blending
 # ----------------------
@@ -114,6 +183,8 @@ def blend(drac_firstlight, ddec_firstlight, drac_blend, ddec_blend, lr):
         - ddec_blended      ndarray - Dec positions after blending, mas
     """
 
-    drac_blended, ddec_blended = drac_firstlight*lr + drac_blend * \
-        (1-lr), ddec_firstlight*lr + ddec_blend*(1-lr)
+    if np.max(np.sqrt((drac_firstlight-drac_blend)**2 + (ddec_firstlight-ddec_blend)**2)) > 200:
+        warnings.warn("You are using separations > 200 mas in the blending function - those sources will not be blended in Gaia data!")
+
+    drac_blended, ddec_blended = drac_firstlight*lr + drac_blend * (1-lr), ddec_firstlight*lr + ddec_blend*(1-lr)
     return drac_blended, ddec_blended
