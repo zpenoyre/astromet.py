@@ -64,13 +64,13 @@ class params():
         self.vomega = 0
         self.tperi = 0  # jyear
         # lensing parameters
-        self.lensdrac = 0  # mas
-        self.lensddec = 0  # mas
-        self.lenspmrac = 0  # mas/year
-        self.lenspmdec = 0  # mas/year
-        self.lensparallax = 0  # mas
+        self.blenddrac = 0  # mas
+        self.blendddec = 0  # mas
+        self.blendpmrac = 0  # mas/year
+        self.blendpmdec = 0  # mas/year
+        self.blendparallax = 0  # mas
         self.thetaE = 0  # mas
-        self.fbl = 1
+        self.blendl = 1
 
         # Below are assumed to be derived from other params
         # (I.e. not(!) specified by user)
@@ -137,15 +137,15 @@ def track(ts, ps, comOnly=False, allComponents=False):
         # track of the lens
         r5d_blend = np.array([ps.blenddrac, ps.blendddec, ps.blendparallax, ps.blendpmrac, ps.blendpmdec])
         dracs_blend, ddecs_blend = xij@r5d_blend  # all in mas
-        dracs_lensed, ddecs_lensed, mag_diff = onsky_lens(dracs, ddecs, dracs_blend, ddecs_blend, ps.thetaE, ps.fbl)
+        dracs_lensed, ddecs_lensed, mag_diff = onsky_lens(dracs, ddecs, dracs_blend, ddecs_blend, ps.thetaE, ps.blendl)
         return dracs_lensed, ddecs_lensed, mag_diff
 
     else:
-        if(ps.fbl < 1): # blending
+        if(ps.blendl < 1): # blending
             # track of the blend
             r5d_blend = np.array([ps.blenddrac, ps.blendddec, ps.blendparallax, ps.blendpmrac, ps.blendpmdec])
             dracs_blend, ddecs_blend = xij@r5d_blend  # all in mas
-            dracs_blended, ddecs_blended = blend(dracs, ddecs, dracs_blend, ddecs_blend, ps.fbl)
+            dracs_blended, ddecs_blended = blend(dracs, ddecs, dracs_blend, ddecs_blend, ps.blendl)
             return dracs_blended, ddecs_blended
 
     return dracs, ddecs
