@@ -63,14 +63,14 @@ class params():
         self.vphi = 45
         self.vomega = 0
         self.tperi = 0  # jyear
-        # lensing parameters
+        # blend parameters
         self.blenddrac = 0  # mas
         self.blendddec = 0  # mas
         self.blendpmrac = 0  # mas/year
         self.blendpmdec = 0  # mas/year
         self.blendparallax = 0  # mas
         self.thetaE = 0  # mas
-        self.blendl = 1
+        self.blendl = 0
 
         # Below are assumed to be derived from other params
         # (I.e. not(!) specified by user)
@@ -141,7 +141,7 @@ def track(ts, ps, comOnly=False, allComponents=False):
         return dracs_lensed, ddecs_lensed, mag_diff
 
     else:
-        if(ps.blendl < 1): # blending
+        if(ps.blendl > 0): # blending
             # track of the blend
             r5d_blend = np.array([ps.blenddrac, ps.blendddec, ps.blendparallax, ps.blendpmrac, ps.blendpmdec])
             dracs_blend, ddecs_blend = xij@r5d_blend  # all in mas

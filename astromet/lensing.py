@@ -5,7 +5,7 @@ import warnings
 # -Lensing
 # ----------------------
 
-def onsky_lens(dracs, ddecs, dracs_blend, ddecs_blend, thetaE, fbl):
+def onsky_lens(dracs, ddecs, dracs_blend, ddecs_blend, thetaE, blendl):
     """
     Returns the lensed tracks as they are seen on the sky, using tracks of the light source and the lens. Takes into account the possibility of blending with the lens.
 
@@ -15,7 +15,7 @@ def onsky_lens(dracs, ddecs, dracs_blend, ddecs_blend, thetaE, fbl):
         - dracs_blend    ndarray - RAcosDec positions of the light source, mas
         - ddecs_blend     ndarray - Dec positions of the light source, mas
         - thetaE    float - angular Einstein radius, mas
-        - fbl       float - blending parameter (flux from the source / combined flux)
+        - blendl       float - blend flux (units of source flux)
     Returns:
         - dracs_lensed      ndarray - RAcosDec positions on the lensed/blended track, mas
         - ddecs_lensed      ndarray - Dec positions on the lensed/blended track, mas
@@ -29,11 +29,11 @@ def onsky_lens(dracs, ddecs, dracs_blend, ddecs_blend, thetaE, fbl):
     mag_diff = -2.5*np.log10(ampl)
 
     # blending - if lens light is significant
-    if(fbl < 1):
-        light_ratio = ampl/(ampl + (1-fbl)/fbl) # source light : total light
+    if(blendl > 0):
+        light_ratio = blendl/ampl # blend light / source light (amplified)
         dracs_blended, ddecs_blended = blend(
             dracs_img, ddecs_img, dracs_blend, ddecs_blend, light_ratio)
-        mag_diff = -2.5*np.log10(1+fbl*(ampl-1))
+        mag_diff = -2.5*np.log10(blendl+ampl)
         return dracs_blended, ddecs_blended, mag_diff
     else:
         return dracs_img, ddecs_img, mag_diff
@@ -156,7 +156,7 @@ def define_lens(u0, t0, tE, piEN, piEE, m0, fbl, pmrac_source, pmdec_source, d_s
 
     # lensing event
     params.thetaE=thetaE
-    params.fbl=fbl
+    params.blendl=(1 - fbl)/fbl
 
     # correct params to include source-lens offset
     params = astromet.get_offset(params, u0, t0)
@@ -186,5 +186,5 @@ def blend(drac_firstlight, ddec_firstlight, drac_blend, ddec_blend, lr):
     if np.max(np.sqrt((drac_firstlight-drac_blend)**2 + (ddec_firstlight-ddec_blend)**2)) > 200:
         warnings.warn("You are using separations > 200 mas in the blending function - those sources will not be blended in Gaia data!")
 
-    drac_blended, ddec_blended = drac_firstlight*lr + drac_blend * (1-lr), ddec_firstlight*lr + ddec_blend*(1-lr)
+    drac_blended, ddec_blended = drac_firstlight/(1+lr) + drac_blend * lr/(1+lr), ddec_firstlight/(1+lr) + ddec_blend * lr/(1+lr)
     return drac_blended, ddec_blended
