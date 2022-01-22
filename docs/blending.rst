@@ -108,30 +108,29 @@ giving:
 
 ::
 
-
-  {'vis_periods': 76,
+  {'vis_periods': 78,
    'n_obs': 100,
-   'drac': -0.011301807524057274,
-   'drac_error': 0.009379378872654694,
-   'ddec': -0.008445686465413424,
-   'ddec_error': 0.009369235193269565,
-   'drac_ddec_corr': -0.0003427894371779837,
-   'parallax': 0.9997128245637159,
-   'parallax_error': 0.010471455252530619,
-   'drac_parallax_corr': -0.047061086997833415,
-   'ddec_parallax_corr': 0.007283925192670643,
-   'pmrac': -4.99922955451988,
-   'pmrac_error': 0.008692598376007978,
-   'drac_pmrac_corr': 0.002506295616405202,
-   'ddec_pmrac_corr': 0.001323711477409411,
-   'parallax_pmrac_corr': 0.18173051512684107,
-   'pmdec': -2.007956151982878,
-   'pmdec_error': 0.008549309567347953,
-   'drac_pmdec_corr': -0.0008688384482675892,
-   'ddec_pmdec_corr': 0.011390727416808143,
-   'parallax_pmdec_corr': 0.018461929030827284,
-   'pmrac_pmdec_corr': 0.003355095873007425,
-   'UWE': 0.93683928518927,
+   'drac': 10.01454303242342,
+   'drac_error': 0.010547596346689378,
+   'ddec': 15.976753022174634,
+   'ddec_error': 0.010519452499717329,
+   'drac_ddec_corr': 0.0027540145652614947,
+   'parallax': 0.7568178159852933,
+   'parallax_error': 0.011613829666341209,
+   'drac_parallax_corr': -0.08057029092578415,
+   'ddec_parallax_corr': -0.03418151447160969,
+   'pmrac': -3.9944613114700074,
+   'pmrac_error': 0.0085348175673892,
+   'drac_pmrac_corr': 0.11816129746211182,
+   'ddec_pmrac_corr': 0.004540923741403878,
+   'parallax_pmrac_corr': -0.13284735365296507,
+   'pmdec': 1.507456250273282,
+   'pmdec_error': 0.008494091221675519,
+   'drac_pmdec_corr': 0.00729850206584718,
+   'ddec_pmdec_corr': 0.1113581941035537,
+   'parallax_pmdec_corr': -0.09058552453993324,
+   'pmrac_pmdec_corr': 0.012034047214395856,
+   'UWE': 1.0450926631191217,
    'ra_ref': 160,
    'dec_ref': -50}
 
@@ -190,7 +189,7 @@ Let's now replace the primary star track with an anomalous one - like that of a 
   params.vtheta=1.5 #[rad]
   params.vomega=5.6 #[rad]
   # time of some periapse passage
-  params.tperi=2016 #[jyear]
+  params.tperi=2016.5 #[jyear]
 
 The figure we'll create now will again show the tracks of both light sources (blue for the binary, red for the blend star) and the blended track (purple).
 
@@ -237,29 +236,29 @@ Now, just like before, we create some mock observations and fit them:
 
 ::
 
-  {'vis_periods': 76,
+  {'vis_periods': 79,
    'n_obs': 100,
-   'drac': -1.1145417529527182,
-   'drac_error': 0.04879876647291026,
-   'ddec': -0.9101537815632521,
-   'ddec_error': 0.04874599122540063,
-   'drac_ddec_corr': -0.0003427894371779837,
-   'parallax': 0.9885124526381458,
-   'parallax_error': 0.05448059049939434,
-   'drac_parallax_corr': -0.04706108699783342,
-   'ddec_parallax_corr': 0.007283925192670642,
-   'pmrac': -4.873420169765144,
-   'pmrac_error': 0.04522560437667363,
-   'drac_pmrac_corr': 0.002506295616405203,
-   'ddec_pmrac_corr': 0.0013237114774094108,
-   'parallax_pmrac_corr': 0.18173051512684105,
-   'pmdec': -1.9090501481976523,
-   'pmdec_error': 0.044480105425525815,
-   'drac_pmdec_corr': -0.0008688384482675892,
-   'ddec_pmdec_corr': 0.011390727416808145,
-   'parallax_pmdec_corr': 0.018461929030827284,
-   'pmrac_pmdec_corr': 0.003355095873007425,
-   'UWE': 4.874160871556728,
+   'drac': -1.0328761497668713,
+   'drac_error': 0.05277611435751417,
+   'ddec': -0.8066522549708861,
+   'ddec_error': 0.05303418028829623,
+   'drac_ddec_corr': -0.022698559981571824,
+   'parallax': 0.9640053358247735,
+   'parallax_error': 0.059291633895102336,
+   'drac_parallax_corr': 0.1357517028428659,
+   'ddec_parallax_corr': -0.1672064475526002,
+   'pmrac': -5.142385044250228,
+   'pmrac_error': 0.049956232914728456,
+   'drac_pmrac_corr': -0.06790849663914658,
+   'ddec_pmrac_corr': 0.01640792862233423,
+   'parallax_pmrac_corr': -0.09812976032023278,
+   'pmdec': -2.127450993583809,
+   'pmdec_error': 0.0498818207873237,
+   'drac_pmdec_corr': -0.011088877492478874,
+   'ddec_pmdec_corr': -0.04074436853875226,
+   'parallax_pmdec_corr': -0.08168499739052537,
+   'pmrac_pmdec_corr': 0.008015729215691094,
+   'UWE': 5.220736204433541,
    'ra_ref': 160,
    'dec_ref': -50}
 
@@ -271,29 +270,29 @@ Now, just like before, we create some mock observations and fit them:
 
 ::
 
-  {'vis_periods': 76,
+  {'vis_periods': 79,
    'n_obs': 100,
-   'drac': 9.439019210786634,
-   'drac_error': 0.0257628310498575,
-   'ddec': 15.550478483757178,
-   'ddec_error': 0.02573496887457158,
-   'drac_ddec_corr': -0.00034278943717798373,
-   'parallax': 0.7222986296307579,
-   'parallax_error': 0.028762494423123102,
-   'drac_parallax_corr': -0.04706108699783342,
-   'ddec_parallax_corr': 0.007283925192670642,
-   'pmrac': -3.951556036533039,
-   'pmrac_error': 0.023876415100179727,
-   'drac_pmrac_corr': 0.0025062956164052025,
-   'ddec_pmrac_corr': 0.0013237114774094108,
-   'parallax_pmrac_corr': 0.18173051512684105,
-   'pmdec': 1.542328450901017,
-   'pmdec_error': 0.02348283622689142,
-   'drac_pmdec_corr': -0.0008688384482675893,
-   'ddec_pmdec_corr': 0.011390727416808143,
-   'parallax_pmdec_corr': 0.018461929030827284,
-   'pmrac_pmdec_corr': 0.0033550958730074244,
-   'UWE': 2.5732655171407104,
+   'drac': 9.480364577180207,
+   'drac_error': 0.030681620165243218,
+   'ddec': 15.490416173603831,
+   'ddec_error': 0.03083164789961199,
+   'drac_ddec_corr': -0.02269855998157182,
+   'parallax': 0.7305642955096495,
+   'parallax_error': 0.03446944535974882,
+   'drac_parallax_corr': 0.13575170284286586,
+   'ddec_parallax_corr': -0.1672064475526002,
+   'pmrac': -4.0733751518943695,
+   'pmrac_error': 0.029042270008608376,
+   'drac_pmrac_corr': -0.06790849663914658,
+   'ddec_pmrac_corr': 0.01640792862233423,
+   'parallax_pmrac_corr': -0.0981297603202328,
+   'pmdec': 1.4259221220040477,
+   'pmdec_error': 0.02899901019957328,
+   'drac_pmdec_corr': -0.011088877492478874,
+   'ddec_pmdec_corr': -0.040744368538752254,
+   'parallax_pmdec_corr': -0.08168499739052539,
+   'pmrac_pmdec_corr': 0.008015729215691094,
+   'UWE': 3.035097357154283,
    'ra_ref': 160,
    'dec_ref': -50}
 
@@ -345,7 +344,7 @@ Now, just like before, we create some mock observations and fit them:
   ax.invert_xaxis()
   plt.show()
 
-.. image:: plots/blendingBinaryFit.png
+.. image:: plots/blendingBinaryFits.png
   :width: 400
   :alt: fit to the blended track
 
