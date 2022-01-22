@@ -6,6 +6,7 @@ from astropy.time import Time
 import scipy.interpolate
 import sys
 import os
+from .lensing import *
 
 # Create units used elsewhere
 mSun = constants.M_sun.to(u.kg).value
@@ -62,6 +63,14 @@ class params():
         self.vphi = 45
         self.vomega = 0
         self.tperi = 0  # jyear
+        # blend parameters
+        self.blenddrac = 0  # mas
+        self.blendddec = 0  # mas
+        self.blendpmrac = 0  # mas/year
+        self.blendpmdec = 0  # mas/year
+        self.blendparallax = 0  # mas
+        self.thetaE = 0  # mas
+        self.blendl = 0
 
         # Below are assumed to be derived from other params
         # (I.e. not(!) specified by user)
@@ -93,36 +102,67 @@ def Delta(ps):
 
 def track(ts, ps, comOnly=False, allComponents=False):
     """
-    Astrometric track in RAcos(Dec) and Dec [mas] for a given binary
+    Astrometric track in RAcos(Dec) and Dec [mas] for a given binary (or lensing event)
     Args:
         - ts,       ndarray - Observation times, jyear.
-        - ps,       params object - Astrometric and binary parameters.
+        - ps,       params object - Astrometric, binary and lensing parameters.
         - comOnly,  bool - If True return only c.o.m track (no binary)
         - allComponents,     bool - If True return pos. of c.o.l. & both components
     Returns:
         - racs      ndarry - RAcosDec at each time, mas
         - decs      ndarry - Dec at each time, mas
+        (optionally) - mag_diff     ndarray - difference from baseline magnitude at each time (for lensing events)
     """
     xij = design_matrix(ts, np.deg2rad(ps.ra), np.deg2rad(ps.dec), epoch=ps.epoch)
 
     r5d = np.array([ps.drac, ps.ddec, ps.parallax, ps.pmrac, ps.pmdec])
     dracs, ddecs = xij@r5d  # all in mas
 
-    if comOnly == True:
-        return dracs, ddecs
-    # extra c.o.l. correction due to binary
-    px1s, py1s, px2s, py2s, pxls, pyls = binaryMotion(
-        ts-ps.tperi, ps.period, ps.q, ps.l, ps.a, ps.e, ps.vtheta, ps.vphi)
-    rls = ps.parallax*(pxls*np.cos(ps.vomega)+pyls*np.sin(ps.vomega))
-    dls = ps.parallax*(pyls*np.cos(ps.vomega)-pxls*np.sin(ps.vomega))
-    if allComponents == False:
-        return dracs+rls, ddecs+dls  # return just the position of the c.o.l.
-    else:  # returns all 3 components
-        r1s = ps.parallax*(px1s*np.cos(ps.vomega)+py1s*np.sin(ps.vomega))
-        d1s = ps.parallax*(py1s*np.cos(ps.vomega)-px1s*np.sin(ps.vomega))
-        r2s = ps.parallax*(px2s*np.cos(ps.vomega)+py2s*np.sin(ps.vomega))
-        d2s = ps.parallax*(py2s*np.cos(ps.vomega)-px2s*np.sin(ps.vomega))
-        return dracs+rls, ddecs+dls, dracs+r1s, ddecs+d1s, dracs+r2s, ddecs+d2s
+    if comOnly == False:
+        # extra c.o.l. correction due to binary
+        px1s, py1s, px2s, py2s, pxls, pyls = binaryMotion(
+            ts-ps.tperi, ps.period, ps.q, ps.l, ps.a, ps.e, ps.vtheta, ps.vphi)
+        rls = ps.parallax*(pxls*np.cos(ps.vomega)+pyls*np.sin(ps.vomega))
+        dls = ps.parallax*(pyls*np.cos(ps.vomega)-pxls*np.sin(ps.vomega))
+        if allComponents == True or (ps.a>0 and ps.thetaE > 0): # gets all 3 components
+            r1s = ps.parallax*(px1s*np.cos(ps.vomega)+py1s*np.sin(ps.vomega))
+            d1s = ps.parallax*(py1s*np.cos(ps.vomega)-px1s*np.sin(ps.vomega))
+            r2s = ps.parallax*(px2s*np.cos(ps.vomega)+py2s*np.sin(ps.vomega))
+            d2s = ps.parallax*(py2s*np.cos(ps.vomega)-px2s*np.sin(ps.vomega))
+            if ps.thetaE == 0:
+                return dracs+rls, ddecs+dls, dracs+r1s, ddecs+d1s, dracs+r2s, ddecs+d2s
+            else: #lensing of both components
+                r5d_blend = np.array([ps.blenddrac, ps.blendddec, ps.blendparallax, ps.blendpmrac, ps.blendpmdec])
+                dracs_blend, ddecs_blend = xij@r5d_blend  # all in mas
+                dracs_lbin, ddecs_lbin, mag_diff, dracs_1_lensed, ddecs_1_lensed, mag_diff_1, dracs_2_lensed, ddecs_2_lensed, mag_diff_2 = lensed_binary(ps, dracs+r1s, ddecs+d1s, dracs+r2s, ddecs+d2s, dracs_blend, ddecs_blend)
+                if allComponents == True:
+                    return dracs_lbin, ddecs_lbin, mag_diff, dracs_1_lensed, ddecs_1_lensed, mag_diff_1, dracs_2_lensed, ddecs_2_lensed, mag_diff_2
+                return dracs_lbin, ddecs_lbin, mag_diff
+        else:
+            if ps.blendl > 0: # blending
+                # track of the blend
+                r5d_blend = np.array([ps.blenddrac, ps.blendddec, ps.blendparallax, ps.blendpmrac, ps.blendpmdec])
+                dracs_blend, ddecs_blend = xij@r5d_blend  # all in mas
+                dracs_blended, ddecs_blended = blend(dracs+rls, ddecs+rls, dracs_blend, ddecs_blend, ps.blendl)
+                return dracs_blended, ddecs_blended
+
+    if ps.thetaE > 0: #lensing
+        # track of the lens
+        r5d_blend = np.array([ps.blenddrac, ps.blendddec, ps.blendparallax, ps.blendpmrac, ps.blendpmdec])
+        dracs_blend, ddecs_blend = xij@r5d_blend  # all in mas
+        dracs_lensed, ddecs_lensed, mag_diff = onsky_lens(dracs, ddecs, dracs_blend, ddecs_blend, ps.thetaE, ps.blendl)
+        return dracs_lensed, ddecs_lensed, mag_diff
+
+    else:
+        if ps.blendl > 0: # blending
+            # track of the blend
+            r5d_blend = np.array([ps.blenddrac, ps.blendddec, ps.blendparallax, ps.blendpmrac, ps.blendpmdec])
+            dracs_blend, ddecs_blend = xij@r5d_blend  # all in mas
+            dracs_blended, ddecs_blended = blend(dracs, ddecs, dracs_blend, ddecs_blend, ps.blendl)
+            return dracs_blended, ddecs_blended
+
+    return dracs, ddecs
+
 
 # ----------------
 # -On-sky motion
@@ -151,8 +191,8 @@ def design_matrix(ts, ra, dec, phis=None, epoch=2016.0):
     design = np.zeros((2, ts.shape[0], 5))
     design[0, :, 0] = 1  # ra*cos(dec)
     design[1, :, 1] = 1  # dec
-    design[0, :, 2] = np.dot(p0, bs.T)  # parallax (ra component)
-    design[1, :, 2] = np.dot(q0, bs.T)  # parallax (dec component)
+    design[0, :, 2] = np.dot(p0, -bs.T)  # parallax (ra component)
+    design[1, :, 2] = np.dot(q0, -bs.T)  # parallax (dec component)
     design[0, :, 3] = ts-epoch  # pmra
     design[1, :, 4] = ts-epoch  # pmdec
 
@@ -770,7 +810,6 @@ def seperation(ts, ps, phis=None):
         return np.sqrt(dracs**2 + ddecs**2)
     else:
         return dracs*np.sin(phis) + ddecs*np.cos(phis)
-
 
 # ----------------------
 # -Utilities
