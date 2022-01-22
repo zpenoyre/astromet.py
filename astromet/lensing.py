@@ -1,5 +1,6 @@
 import numpy as np
 from astropy.coordinates import get_body_barycentric_posvel
+from astropy import units as u
 from astropy.time import Time
 import warnings
 
