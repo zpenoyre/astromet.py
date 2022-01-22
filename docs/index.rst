@@ -14,8 +14,8 @@ Make and fit astrometric tracks
    installation
    quickstart
    fit()
-
-
+   blending
+   lensing
 
 Indices and tables
 ==================
