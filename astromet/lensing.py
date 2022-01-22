@@ -98,16 +98,19 @@ def get_offset(params, u0, t0):
     params.blenddrac, params.blendddec = offset_mas[0], offset_mas[1]
     return params
 
-def define_lens(u0, t0, tE, piEN, piEE, m0, fbl, pmrac_source, pmdec_source, d_source, thetaE):
+def define_lens(params, ra, dec,  u0, t0, tE, piEN, piEE, m0, fbl, pmrac_source, pmdec_source, d_source, thetaE):
     """
     Defines astromet parameters using standard microlensing parameters (u0, t0, tE, piEN, piEE, m0, fbl), kinematics of the source and thetaE.
 
     Args:
         (returned from a photometric model)
+        - params        astromet parameters to overwrite
+        - ra            float - right ascension, deg
+        - dec           float - declination, deg
         - u0            float - impact parameter - lens-source separation at closest approach in units of the angular Einstein radius
         - t0            float - time of closest lens-source approach, reduced JD
         - tE            float - timescale of the event, days
-        - piEN          float - local north component of the microlensing parallax vector (..)
+        - piEN          float - local north component of the microlensing parallax vector
         - piEE          float - local east component of the microlensing parallax vector
         - m0            float - magnitude at baseline, mag
         - fbl           float - blending parameter (flux from the source / combined flux)
@@ -141,11 +144,8 @@ def define_lens(u0, t0, tE, piEN, piEE, m0, fbl, pmrac_source, pmdec_source, d_s
     pi_source = 1/d_source
     pi_lens = pi_source + pi_rel
 
-    # astromet parameters
-    params=astromet.params()
-
-    params.ra=ra_event
-    params.dec=dec_event
+    params.ra=ra
+    params.dec=dec
 
     # source motion
     params.parallax=pi_source
@@ -162,7 +162,7 @@ def define_lens(u0, t0, tE, piEN, piEE, m0, fbl, pmrac_source, pmdec_source, d_s
     params.blendl=(1 - fbl)/fbl
 
     # correct params to include source-lens offset
-    params = astromet.get_offset(params, u0, t0)
+    params = get_offset(params, u0, t0)
 
     return params
 

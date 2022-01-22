@@ -373,7 +373,8 @@ notes for microlensers
 If you prefer to operate in the standard microlensing parameters from the photometric model (u0, t0, tE, piEN, piEE, m0, fbl), you can easily create a track using them. Note that, because of degeneracies, those parameters are not enough to define an astrometric track, and you have to also assume some value of :math:`\theta_E` and enter the astrometry of the source (pmrac_source, pmdec_source, d_source).
 
 ::
-  params = define_lens(u0, t0, tE, piEN, piEE, m0, fbl, pmrac_source, pmdec_source, d_source, thetaE)
+  params = astromet.params()
+  params = astromet.define_lens(params, u0, t0, tE, piEN, piEE, m0, fbl, pmrac_source, pmdec_source, d_source, thetaE)
   drac, ddec, mag_diff = astromet.track(ts, params)
 
 Alternatively, if you have previously defined :math:`\theta_E`, as well as the proper motions and parallaxes of the source and the lens, and just want to get the offset between those tracks, you can call:
