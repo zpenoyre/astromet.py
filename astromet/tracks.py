@@ -59,8 +59,8 @@ class params():
         self.e = 0.1
         self.q = 0
         self.l = 0  # assumed < 1 (though may not matter)
-        self.vtheta = 45
-        self.vphi = 45
+        self.vtheta = np.pi/4
+        self.vphi = np.pi/4
         self.vomega = 0
         self.tperi = 0  # jyear
         # blend parameters
@@ -191,8 +191,8 @@ def design_matrix(ts, ra, dec, phis=None, epoch=2016.0):
     design = np.zeros((2, ts.shape[0], 5))
     design[0, :, 0] = 1  # ra*cos(dec)
     design[1, :, 1] = 1  # dec
-    design[0, :, 2] = np.dot(p0, -bs.T)  # parallax (ra component)
-    design[1, :, 2] = np.dot(q0, -bs.T)  # parallax (dec component)
+    design[0, :, 2] = -np.dot(p0, bs.T)  # parallax (ra component)
+    design[1, :, 2] = -np.dot(q0, bs.T)  # parallax (dec component)
     design[0, :, 3] = ts-epoch  # pmra
     design[1, :, 4] = ts-epoch  # pmdec
 
@@ -208,40 +208,6 @@ def design_matrix(ts, ra, dec, phis=None, epoch=2016.0):
     return design
 
 
-'''
-def design_1d(ts, phis, ra, dec, epoch=2016.0):
-    """
-    design_1d - Design matrix for 1d source track in along-scan direction
-    Args:
-        - t,       ndarray - Observation times, jyear.
-        - phis,     ndarray - scan angles.
-        - ra, dec,  float - reference right ascension and declination of source, radians
-        - epoch     float - time at which position and pm are measured, years CE
-    Returns:
-        - design, ndarry - Design matrix
-    """
-    # Barycentric coordinates of Gaia at time t
-    bs = barycentricPosition(ts)
-    # unit vector in direction of increasing ra - the local west unit vector
-    p0 = np.array([-np.sin(ra), np.cos(ra), 0])
-    # unit vector in direction of increasing dec - the local north unit vector
-    q0 = np.array([-np.cos(ra)*np.sin(dec), -np.sin(ra)*np.sin(dec), np.cos(dec)])
-
-    # sin and cos angles
-    angles = np.deg2rad(phis)
-    sina = np.sin(angles)
-    cosa = np.cos(angles)
-    pifactor = sina*np.dot(p0, bs.T) + cosa*np.dot(q0, bs.T)
-
-    # Construct design matrix
-    design = np.zeros((ts.shape[0], 5))
-    design[:, 0] = sina
-    design[:, 1] = cosa
-    design[:, 2] = pifactor
-    design[:, 3] = sina*(ts-epoch)
-    design[:, 4] = cosa*(ts-epoch)
-
-    return design'''
 
 
 def barycentricPosition(time):
