@@ -178,8 +178,8 @@ def design_matrix(ts, ra, dec, phis=None, epoch=2016.0):
     design = np.zeros((2, ts.shape[0], 5))
     design[0, :, 0] = 1  # ra*cos(dec)
     design[1, :, 1] = 1  # dec
-    design[0, :, 2] = np.dot(p0, bs.T)  # parallax (ra component)
-    design[1, :, 2] = np.dot(q0, bs.T)  # parallax (dec component)
+    design[0, :, 2] = np.dot(p0, -bs.T)  # parallax (ra component)
+    design[1, :, 2] = np.dot(q0, -bs.T)  # parallax (dec component)
     design[0, :, 3] = ts-epoch  # pmra
     design[1, :, 4] = ts-epoch  # pmdec
 
