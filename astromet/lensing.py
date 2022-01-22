@@ -168,6 +168,8 @@ def define_lens(params, ra, dec,  u0, t0, tE, piEN, piEE, m0, fbl, pmrac_source,
 
 def lensed_binary(params, dracs1, ddecs1, dracs2, ddecs2, dracs_blend, ddecs_blend):
 
+        warnings.warn("warning - lensed binaries are implemented but not fully tested - let us know if they work (or break)")
+
         # break down blendl
         blendl_1 = params.blendl*(1 + params.l)
         blendl_2 = params.blendl*(1 + params.l)/params.l
