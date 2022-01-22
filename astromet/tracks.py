@@ -124,7 +124,7 @@ def track(ts, ps, comOnly=False, allComponents=False):
             ts-ps.tperi, ps.period, ps.q, ps.l, ps.a, ps.e, ps.vtheta, ps.vphi)
         rls = ps.parallax*(pxls*np.cos(ps.vomega)+pyls*np.sin(ps.vomega))
         dls = ps.parallax*(pyls*np.cos(ps.vomega)-pxls*np.sin(ps.vomega))
-        if allComponents == True or ps.thetaE > 0: # gets all 3 components
+        if allComponents == True or (ps.a>0 and ps.thetaE > 0): # gets all 3 components
             r1s = ps.parallax*(px1s*np.cos(ps.vomega)+py1s*np.sin(ps.vomega))
             d1s = ps.parallax*(py1s*np.cos(ps.vomega)-px1s*np.sin(ps.vomega))
             r2s = ps.parallax*(px2s*np.cos(ps.vomega)+py2s*np.sin(ps.vomega))
@@ -132,7 +132,9 @@ def track(ts, ps, comOnly=False, allComponents=False):
             if ps.thetaE == 0:
                 return dracs+rls, ddecs+dls, dracs+r1s, ddecs+d1s, dracs+r2s, ddecs+d2s
             else: #lensing of both components
-                dracs_lbin, ddecs_lbin, mag_diff, dracs_1_lensed, ddecs_1_lensed, mag_diff_1, dracs_2_lensed, ddecs_2_lensed, mag_diff_2 = lensed_binary(ps, dracs+r1s, ddecs+d1s, dracs+r2s, ddecs+d2s)
+                r5d_blend = np.array([ps.blenddrac, ps.blendddec, ps.blendparallax, ps.blendpmrac, ps.blendpmdec])
+                dracs_blend, ddecs_blend = xij@r5d_blend  # all in mas
+                dracs_lbin, ddecs_lbin, mag_diff, dracs_1_lensed, ddecs_1_lensed, mag_diff_1, dracs_2_lensed, ddecs_2_lensed, mag_diff_2 = lensed_binary(ps, dracs+r1s, ddecs+d1s, dracs+r2s, ddecs+d2s, dracs_blend, ddecs_blend)
                 if allComponents == True:
                     return dracs_lbin, ddecs_lbin, mag_diff, dracs_1_lensed, ddecs_1_lensed, mag_diff_1, dracs_2_lensed, ddecs_2_lensed, mag_diff_2
                 return dracs_lbin, ddecs_lbin, mag_diff

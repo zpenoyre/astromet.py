@@ -166,10 +166,7 @@ def define_lens(params, ra, dec,  u0, t0, tE, piEN, piEE, m0, fbl, pmrac_source,
 
     return params
 
-def lensed_binary(params, dracs1, ddecs1, dracs2, ddecs2):
-
-        r5d_blend = np.array([params.blenddrac, params.blendddec, params.blendparallax, params.blendpmrac, params.blendpmdec])
-        dracs_blend, ddecs_blend = xij@r5d_blend  # all in mas
+def lensed_binary(params, dracs1, ddecs1, dracs2, ddecs2, dracs_blend, ddecs_blend):
 
         # break down blendl
         blendl_1 = params.blendl*(1 + params.l)
