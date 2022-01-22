@@ -145,6 +145,7 @@ def track(ts, ps, comOnly=False, allComponents=False):
                 dracs_blend, ddecs_blend = xij@r5d_blend  # all in mas
                 dracs_blended, ddecs_blended = blend(dracs+rls, ddecs+rls, dracs_blend, ddecs_blend, ps.blendl)
                 return dracs_blended, ddecs_blended
+        return dracs+rls, ddecs+dls
 
     if ps.thetaE > 0: #lensing
         # track of the lens
