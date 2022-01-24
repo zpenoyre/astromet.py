@@ -4,18 +4,18 @@ a note on coordinates
 ---------------------
 
 We generally record the position of astronomical objects in a spherical
- coordinate system, such as Right Ascension and Declination (or in an ideal
- world for astrometry Ecliptic Longitude and Latitude).
+coordinate system, such as Right Ascension and Declination (or in an ideal
+world for astrometry Ecliptic Longitude and Latitude).
 
- This is *not* a euclidean geometry - Pythagoras theorem (and all our normal
- concepts of distance) are approximately true on the equator, but increasingly
- fall apart towards the poles.
+This is *not* a euclidean geometry - Pythagoras theorem (and all our normal
+concepts of distance) are approximately true on the equator, but increasingly
+fall apart towards the poles.
 
- This is why in much of this package we'll work in coordinates RA cos(Dec) and Dec,
- which *are* euclidean. Confusingly lots of astrometric data is given in a combination
- of these two systems. For example proper motion is almost always recorded in the
- euclidean system, and Gaia returns position as RA [deg] but error as the uncertainty
- in RA cos(Dec) [mas].
+This is why in much of this package we'll work in coordinates RA cos(Dec) and Dec,
+which *are* euclidean. Confusingly lots of astrometric data is given in a combination
+of these two systems. For example proper motion is almost always recorded in the
+euclidean system, and Gaia returns position as RA [deg] but error as the uncertainty
+in RA cos(Dec) [mas].
 
 Rather than work in global coordinates (in degrees) we'll work in some local
 displacement relative to some initial approximate RA and Dec - these are needed

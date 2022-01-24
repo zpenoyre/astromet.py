@@ -1,6 +1,6 @@
 # astromet.py
 
-A simple python package for generating astrometric tracks of single stars and the center of light of binary systems.
+A simple python package for generating astrometric tracks of single stars and the center of light of unresolved binary, blended and lensed systems. Includes a close emulation of Gaia's astrometric fitting pipeline.
 
 https://astrometpy.readthedocs.io/en/latest/
 

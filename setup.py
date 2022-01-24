@@ -6,7 +6,7 @@ except ImportError:
 #from distutils.extension import Extension
 
 setup(name="astromet",
-      version='1.0.16',
+      version='1.1.0',
       description='One and two body astrometry',
       author='Zephyr Penoyre',
       author_email='zephyrpenoyre@gmail.com',
