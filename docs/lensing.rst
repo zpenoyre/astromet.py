@@ -370,7 +370,7 @@ Let's use our unblended, purple track and add a background star with a defined t
 lensed binaries
 ---------------
 
-If you set both the binary parameters and the lensing parameters, you will end up with a track of a lensed binary system. Those tracks can be very interesting and complicated; potentially, lensed binaries could be responsible for some events where fitting a photometric model of a single lensed star doesn't work well. Use with caution as this part has not been fully tested; if you do use it, we encourage you to let us know how it's working!
+If you set both the binary parameters and the lensing parameters, you will end up with a track of a lensed binary system (i.e. a weighted average of tracks of images of both components after lensing). Those tracks can be very interesting and complicated; potentially, lensed binaries could be responsible for some events where fitting a photometric model of a single lensed star doesn't work well. Use with caution as this part has not been fully tested; if you do use it, we encourage you to let us know how it's working!
 
 .. image:: plots/lensedBinary.png
   :width: 400
