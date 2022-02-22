@@ -136,7 +136,7 @@ def fit_model(x_obs, x_err, M_matrix, prior=None):
 def mock_obs(ts, phis, racs, decs, err=0, nmeasure=9):
     """
     Converts positions to comparable observables to real astrometric measurements
-    (i.e. 1D psoitions along some scan angle, optionlly with errors added)
+    (i.e. 1D positions along some scan angle, optionlly with errors added)
     Args:
         - ts,       ndarray - Observation times, jyear.
         - phis,     ndarray - Scanning angles (0 north, 90 east), degrees.

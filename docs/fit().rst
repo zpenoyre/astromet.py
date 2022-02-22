@@ -42,6 +42,10 @@ times and angles Gaia visited a patch of sky.
     ts=np.double(ts[sort])                          # [jyr]
     phis=np.squeeze(np.hstack(sl['angles']))[sort]  # [deg]
 
+
+N.B. we could also use the scanning law data directly from a GOST_ web query, though we would need to convert the times to years (from BJD) and the angles to degrees (from radians).
+
+
 which we can have a look at
 ::
 
@@ -167,3 +171,4 @@ using
     gaia_results=astromet.gaia_results(bresults)
 
 .. _scanning-law: https://github.com/gaiaverse/scanninglaw
+.. _GOST: https://gaia.esac.esa.int/gost/index.jsp
