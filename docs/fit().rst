@@ -27,23 +27,26 @@ times and angles Gaia visited a patch of sky.
     import astromet
     import numpy as np
     import matplotlib.pyplot as plt
-    import scanninglaw.times
-    from scanninglaw.source import Source
+    import scanninglaw
 
-    dr3_sl=scanninglaw.times.Times(version='dr3_nominal') # slow step - run only once
+    # slow step - takes ≈30 seconds for me - run only once
+    dr3_sl=scanninglaw.times.Times(version='dr3_nominal')
 
     ra=160
     dec=-50
-    c=Source(ra,dec,unit='deg')
+    c=scanninglaw.source.Source(ra,dec,unit='deg')
+
     sl=dr3_sl(c, return_times=True, return_angles=True)
 
-    ts=2010+np.squeeze(np.hstack(sl['times']))/365.25
+    ts=np.squeeze(np.hstack(sl['times'])).astype('double')
     sort=np.argsort(ts)
-    ts=np.double(ts[sort])                          # [jyr]
-    phis=np.squeeze(np.hstack(sl['angles']))[sort]  # [deg]
+    ts=2010+ts[sort]/365.25
+    phis=np.squeeze(np.hstack(sl['angles']))[sort].astype('double')
 
 
-N.B. we could also use the scanning law data directly from a GOST_ web query, though we would need to convert the times to years (from BJD) and the angles to degrees (from radians).
+N.B. we could also use the scanning law data directly from a GOST_ web query,
+though we would need to convert the times to years (from BJD) and the angles to
+degrees (from radians).
 
 
 which we can have a look at
