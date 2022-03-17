@@ -12,5 +12,6 @@ Requires:
 numpy
 astropy
 scipy
+
 numba (optional)
 matplotlib (for notebooks)
