@@ -26,8 +26,6 @@ mas = (1.0*u.mas).to(u.deg).value
 earth_sun_mass_ratio = (constants.M_earth/constants.M_sun).value
 tbegin = 2014.6670  # time (in years) of Gaia's first observations
 
-use_backup = True  # If set to true use simpler backup Kepler equation solver.
-
 # loads data needed to find astrometric error as functon of magnitude
 # data digitized from Lindegren+2020 fig A.1
 local_dir = os.path.dirname(__file__)  # <-- absolute dir the script is in
@@ -215,156 +213,30 @@ def barycentricPosition(time):
 
 
 # binary orbit
+def findEtas(ts, period, ecc, tPeri=0, N_it=10):
+    # finds eccentric anomaly with iterative Halley's method
+    phase=2*np.pi*(((ts-tPeri)/period) % 1)
 
+    sph=np.sin(phase)
+    cph=np.cos(phase)
+    # initial guess expanding to third order in eccentricity
+    eta=phase + ecc*sph + (ecc**2)*sph*cph + 0.5*(ecc**3)*sph*(3*(cph**2)-1)
+    deltaeta=1
 
-def conditional_njit(backup=None):
-    def decorator(func):
-        try:
-            from numba import njit
-            return njit(func)
-        except ImportError:
-            if backup == None:
-                return func
-            else:
-                return backup
-    return decorator
-
-
-def findEtas(ts, period, eccentricity, tPeri=0, N_it=10):
-    if use_backup==True:
-        etas = findEtas_backup(ts, period, eccentricity, tPeri=tPeri)
-    else:
-        etas = findEtas_full(ts, period, eccentricity, tPeri=tPeri,N_it=N_it)
-    return etas
-
-# finds an (approximate) eccentric anomaly (see Penoyre & Sandford 2019, appendix A)
-def findEtas_backup(ts, period, eccentricity, tPeri=0):
-    #print('using backup Kepler equation solver')
-    eta0s = ((2*np.pi/period)*(ts-tPeri)) % (2.0*np.pi)  # (2*np.pi/period)*(ts-tPeri)
-    eta1s = eccentricity*np.sin(eta0s)
-    eta2s = (eccentricity**2)*np.sin(eta0s)*np.cos(eta0s)
-    eta3s = (eccentricity**3)*np.sin(eta0s)*(1-(3/2)*np.sin(eta0s)**2)
-    return eta0s+eta1s+eta2s+eta3s
-
-@conditional_njit(findEtas_backup)
-def findEtas_full(ts, period, eccentricity, tPeri=0, N_it=10):
-    """Solve Kepler's equation, E - e sin E = ell, via the contour integration method of Philcox et al. (2021)
-    This uses techniques described in Ullisch (2020) to solve the `geometric goat problem'.
-    Args:
-        ts (np.ndarray): Times.
-        period (float): Period of orbit.
-        eccentricity (float): Eccentricity. Must be in the range 0<e<1.
-        tPeri (float): Pericentre time.
-        N_it (float): Number of grid-points.
-    Returns:
-        np.ndarray: Array of eccentric anomalies, E.
-
-    Slightly edited version of code taken from https://github.com/oliverphilcox/Keplers-Goat-Herd
-    """
-    ell_array = ((2*np.pi/period)*(ts-tPeri)) % (2.0*np.pi)
-
-    # Check inputs
-    if eccentricity <= 0.:
-        raise Exception("Eccentricity must be greater than zero!")
-    elif eccentricity >= 1:
-        raise Exception("Eccentricity must be less than unity!")
-    if np.max(ell_array) > 2.*np.pi:
-        raise Exception("Mean anomaly should be in the range (0, 2 pi)")
-    if np.min(ell_array) < 0:
-        raise Exception("Mean anomaly should be in the range (0, 2 pi)")
-    if N_it < 2:
-        raise Exception("Need at least two sampling points!")
-
-    # Define sampling points
-    N_points = N_it - 2
-    N_fft = (N_it-1)*2
-
-    # Define contour radius
-    radius = eccentricity/2
-
-    # Generate e^{ikx} sampling points and precompute real and imaginary parts
-    j_arr = np.arange(N_points)
-    freq = (2*np.pi*(j_arr+1.)/N_fft).reshape((-1, 1))  # [:,np.newaxis]
-    exp2R = np.cos(freq)
-    exp2I = np.sin(freq)
-    ecosR = eccentricity*np.cos(radius*exp2R)
-    esinR = eccentricity*np.sin(radius*exp2R)
-    exp4R = exp2R*exp2R-exp2I*exp2I
-    exp4I = 2.*exp2R*exp2I
-    coshI = np.cosh(radius*exp2I)
-    sinhI = np.sinh(radius*exp2I)
-
-    # Precompute e sin(e/2) and e cos(e/2)
-    esinRadius = eccentricity*np.sin(radius)
-    ecosRadius = eccentricity*np.cos(radius)
-
-    # Define contour center for each ell and precompute sin(center), cos(center)
-    filt = ell_array < np.pi
-    center = ell_array-eccentricity/2.
-    center[filt] += eccentricity
-    sinC = np.sin(center)
-    cosC = np.cos(center)
-    output = center
-
-    # Accumulate Fourier coefficients
-    # NB: we halve the integration range by symmetry, absorbing factor of 2 into ratio
-
-    # Separate out j = 0 piece, which is simpler
-
-    # Compute z in real and imaginary parts (zI = 0 here)
-    zR = center + radius
-
-    # Compute e*sin(zR) from precomputed quantities
-    tmpsin = sinC*ecosRadius+cosC*esinRadius
-
-    # Compute f(z(x)) in real and imaginary parts (fxI = 0)
-    fxR = zR - tmpsin - ell_array
-
-    # Add to arrays, with factor of 1/2 since an edge
-    ft_gx2 = 0.5/fxR
-    ft_gx1 = 0.5/fxR
-
-    # Compute j = 1 to N_points pieces
-
-    # Compute z in real and imaginary parts
-    zR = center + radius*exp2R
-    zI = radius*exp2I
-
-    # Compute f(z(x)) in real and imaginary parts
-    # can use precomputed cosh / sinh / cos / sin for this!
-    tmpsin = sinC*ecosR+cosC*esinR  # e sin(zR)
-    tmpcos = cosC*ecosR-sinC*esinR  # e cos(zR)
-
-    fxR = zR - tmpsin*coshI-ell_array
-    fxI = zI - tmpcos*sinhI
-
-    # Compute 1/f(z) and append to array
-    ftmp = fxR*fxR+fxI*fxI
-    fxR /= ftmp
-    fxI /= ftmp
-
-    ft_gx2 += np.sum(exp4R*fxR+exp4I*fxI, axis=0)
-    ft_gx1 += np.sum(exp2R*fxR+exp2I*fxI, axis=0)
-
-    # Separate out j = N_it piece, which is simpler
-
-    # Compute z in real and imaginary parts (zI = 0 here)
-    zR = center - radius
-
-    # Compute sin(zR) from precomputed quantities
-    tmpsin = sinC*ecosRadius-cosC*esinRadius
-
-    # Compute f(z(x)) in real and imaginary parts (fxI = 0 here)
-    fxR = zR - tmpsin-ell_array
-
-    # Add to sum, with 1/2 factor for edges
-    ft_gx2 += 0.5/fxR
-    ft_gx1 += -0.5/fxR
-
-    # Compute and return the solution E(ell,e)
-    output += radius*ft_gx2/ft_gx1
-
-    return output
+    it=0
+    while ((np.max(np.abs(deltaeta))>1e-5) & (it<N_it)):
+    # Halley's method
+        it+=1
+        sineta=np.sin(eta)
+        coseta=np.cos(eta)
+        f  = eta - ecc*sineta - phase
+        df = 1.  - ecc*coseta
+        d2f= ecc*sineta
+        deltaeta  = -f*df / (df*df - 0.5*f*d2f)
+        eta      += deltaeta
+    # since the Halley method converges cubically, a correction < 1e-5 at the current iteration
+    # implies that it would be <~1e-15 at the next iteration, which is beyond the precision limit
+    return eta
 
 
 def bodyPos(pxs, pys, l, q):  # given the displacements transform to c.o.m. frame
@@ -731,7 +603,7 @@ def dtheta_old(ps, t1, t2):
     return np.sqrt(av_epssq-aveps_sq)
 
 
-def radial_velocity(ts, ps, source='c'):
+def radial_velocity(ts, ps, source='p'):
     # are we seeing the radial veloicty of the photocenter (combined)
     # or of the primary or secondary?
     if ps.a == 0:
