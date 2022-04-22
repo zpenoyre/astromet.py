@@ -119,7 +119,7 @@ def track(ts, ps, comOnly=False, allComponents=False):
     if comOnly == False:
         # extra c.o.l. correction due to binary
         px1s, py1s, px2s, py2s, pxls, pyls = binaryMotion(
-            ts-ps.tperi, ps.period, ps.q, ps.l, ps.a, ps.e, ps.vtheta, ps.vphi)
+            ts, ps.period, ps.q, ps.l, ps.a, ps.e, ps.vtheta, ps.vphi,tPeri=ps.tperi)
         rls = ps.parallax*(pxls*np.cos(ps.vomega)+pyls*np.sin(ps.vomega))
         dls = ps.parallax*(pyls*np.cos(ps.vomega)-pxls*np.sin(ps.vomega))
         if allComponents == True or (ps.a > 0 and ps.thetaE > 0): # gets all 3 components
@@ -621,6 +621,18 @@ def radial_velocity(ts, ps, source='p'):
     unitconv = ((1.0*u.AU).to(u.m).value)/((1.0*u.yr).to(u.s).value)
     return unitconv*(2*np.pi*ps.a/ps.period)*Delta*np.sin(ps.vtheta)*bracket
 
+def equilibrium_tide(ts,ps,R,beta=1):
+    # quick approximate equilibrium tide computation for eclipsing binaries
+    # taken from Penoyre & Stone 2019 eq 78
+    # R is the stellar radius in AU
+    # beta is a dimensionles factor (order unity) to capture unmodelled variations
+    if ps.a == 0:
+        return np.zeros(ts.size)
+    etas = findEtas(ts, ps.period, ps.e, tPeri=ps.tperi)
+    phis = np.arctan2(np.sqrt(1-ps.e**2)*np.sin(etas),np.cos(etas)-ps.e)
+    rs = ps.a*(1-ps.e*np.cos(etas))
+    viewterm = 3*(np.sin(ps.vtheta)**2)*(np.cos(ps.vphi-phis)**2)-1
+    return -beta*ps.q*np.power(R/rs,3)*viewterm
 
 def seperation(ts, ps, phis=None):
     if ps.a == 0:
