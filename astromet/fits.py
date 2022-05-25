@@ -206,7 +206,7 @@ def fit(ts, xs, phis, xerr, ra, dec, G=12, epoch=2016.0):
     results['chi2']      = np.sum(R**2 / xerr**2)
     results['n_good_obs']= np.sum(weights>0.2)
     nparam=5 #results['astrometric_params_solved'].bit_count()
-    results['UWE']= np.sqrt(np.sum(R**2 / xerr**2)/(np.sum(weights>0.2)-nparam))
+    results['uwe']= np.sqrt(np.sum(R**2 / xerr**2)/(np.sum(weights>0.2)-nparam))
     results['ra_ref']=ra
     results['dec_ref']=dec
 
@@ -237,7 +237,7 @@ def gaia_results(results):
     gresults['astrometric_excess_noise']=results['excess_noise']
     gresults['astrometric_chi2_al']=results['chi2']
     gresults['astrometric_n_good_obs_al']=results['n_good_obs']
-    gresults['UWE']=results['UWE']
+    gresults['uwe']=results['uwe']
     return gresults
 
 def simple_fit(ts, racs, decs, errs, ra, dec, G=12, epoch=2016.0):
@@ -281,7 +281,7 @@ def simple_fit(ts, racs, decs, errs, ra, dec, G=12, epoch=2016.0):
             results[coords[j]+'_'+coords[i]+'_corr']=\
                 fitcov[i,j]/np.sqrt(fitcov[i,i]*fitcov[j,j])
 
-    results['UWE']= uwe
+    results['uwe']= uwe
     results['ra_ref']=ra
     results['dec_ref']=dec
 
@@ -353,6 +353,6 @@ def agis(r5d, t, phi, x_err, extra=None, epoch=2016.0, G=None):
     results['astrometric_chi2_al']      = np.sum(R**2 / x_err**2)
     results['astrometric_n_good_obs_al']= np.sum(weights>0.2)
     nparam=5 #results['astrometric_params_solved'].bit_count()
-    results['UWE']= np.sqrt(np.sum(R**2 / x_err**2)/(np.sum(weights>0.2)-nparam))
+    results['uwe']= np.sqrt(np.sum(R**2 / x_err**2)/(np.sum(weights>0.2)-nparam))
 
     return results
