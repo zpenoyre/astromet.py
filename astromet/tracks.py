@@ -31,10 +31,32 @@ tbegin = 2014.6670  # time (in years) of Gaia's first observations
 local_dir = os.path.dirname(__file__)  # <-- absolute dir the script is in
 rel_path = '/data/scatteral_edr3.csv'
 abs_file_path = local_dir+rel_path  # os.path.join(local_dir, rel_path)
+
 sigma_al_data = np.genfromtxt(abs_file_path, skip_header=1, delimiter=',', unpack=True)
 mags = sigma_al_data[0]
 sigma_als = sigma_al_data[1]
 sigma_ast = scipy.interpolate.interp1d(mags, sigma_als, bounds_error=False)
+
+spec_abs_file_path=local_dir+'/data/dr3_spec_error.csv'
+sigma_spec_data = np.genfromtxt(spec_abs_file_path, skip_header=1, delimiter=',', unpack=True)
+spec_mags = sigma_spec_data[0]
+spec_cols = sigma_spec_data[1]
+spec_sigmas = sigma_spec_data[2]
+def sigma_spec(mag,col):
+    return scipy.interpolate.griddata((spec_mags,spec_cols),
+     spec_sigmas,
+     (mag,col), bounds_error=False)
+
+phot_abs_file_path=local_dir+'/data/dr3_phot_error.csv'
+sigma_phot_data = np.genfromtxt(phot_abs_file_path, skip_header=1, delimiter=',', unpack=True)
+phot_mags = sigma_phot_data[0]
+phot_cols = sigma_phot_data[1]
+phot_sigmas = sigma_phot_data[2]
+def sigma_spec(mag,col):
+    return scipy.interpolate.griddata(phot_mags, phot_cols),
+     phot_sigmas,
+     (mag,col), bounds_error=False)
+
 
 # ----------------
 # -User functions
