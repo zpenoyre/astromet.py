@@ -39,24 +39,23 @@ sigma_ast = scipy.interpolate.interp1d(mags, sigma_als, bounds_error=False)
 
 spec_abs_file_path=local_dir+'/data/dr3_spec_error.csv'
 sigma_spec_data = np.genfromtxt(spec_abs_file_path, skip_header=1, delimiter=',', unpack=True)
-spec_mags = sigma_spec_data[0]
-spec_cols = sigma_spec_data[1]
-spec_sigmas = sigma_spec_data[2]
-def sigma_spec(mag,col):
-    return scipy.interpolate.griddata((spec_mags,spec_cols),
-     spec_sigmas,
-     (mag,col), bounds_error=False)
+spec_mags = np.unique(sigma_spec_data[0])
+spec_cols = np.unique(sigma_spec_data[1])
+spec_sigmas = np.reshape(sigma_spec_data[2],(spec_mags.size,spec_cols.size))
+sigma_spec_int=scipy.interpolate.RegularGridInterpolator((spec_mags,spec_cols),
+    np.log10(spec_sigmas),method='linear')
+def sigma_spec(mags,cols):
+    return 10**sigma_spec_int(np.vstack([mags,cols]).T)
 
 phot_abs_file_path=local_dir+'/data/dr3_phot_error.csv'
 sigma_phot_data = np.genfromtxt(phot_abs_file_path, skip_header=1, delimiter=',', unpack=True)
-phot_mags = sigma_phot_data[0]
-phot_cols = sigma_phot_data[1]
-phot_sigmas = sigma_phot_data[2]
-def sigma_spec(mag,col):
-    return scipy.interpolate.griddata(phot_mags, phot_cols),
-     phot_sigmas,
-     (mag,col), bounds_error=False)
-
+phot_mags = np.unique(sigma_phot_data[0])
+phot_cols = np.unique(sigma_phot_data[1])
+phot_sigmas = np.reshape(sigma_phot_data[2],(phot_mags.size,phot_cols.size))
+sigma_phot_int=scipy.interpolate.RegularGridInterpolator((phot_mags,phot_cols),
+    np.log10(phot_sigmas),method='linear')
+def sigma_phot(mags,cols):
+    return 10**sigma_phot_int(np.vstack([mags,cols]).T)
 
 # ----------------
 # -User functions
