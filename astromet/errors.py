@@ -13,7 +13,7 @@ sigma_als = sigma_al_data[1]
 sigma_ast = scipy.interpolate.interp1d(mags, sigma_als, bounds_error=False)
 
 # equivalent for spectroscopic errors (using DR3 RVS)
-spec_abs_file_path=local_dir+'/data/dr3_spec_error.csv'
+spec_abs_file_path=local_dir+'/data/dr3_rvs_spec_error.csv'
 sigma_spec_data = np.genfromtxt(spec_abs_file_path, skip_header=1, delimiter=',', unpack=True)
 spec_mags = np.unique(sigma_spec_data[0])
 spec_cols = np.unique(sigma_spec_data[1])
@@ -24,7 +24,7 @@ def sigma_spec(mags,cols):
     return 10**sigma_spec_int(np.vstack([mags,cols]).T)
 
 # equivalent for photometric errors (using DR3 RVS)
-phot_abs_file_path=local_dir+'/data/dr3_phot_error.csv'
+phot_abs_file_path=local_dir+'/data/dr3_rvs_phot_error.csv'
 sigma_phot_data = np.genfromtxt(phot_abs_file_path, skip_header=1, delimiter=',', unpack=True)
 phot_mags = np.unique(sigma_phot_data[0])
 phot_cols = np.unique(sigma_phot_data[1])
