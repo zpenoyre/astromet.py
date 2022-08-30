@@ -21,6 +21,8 @@ spec_sigmas = np.reshape(sigma_spec_data[2],(spec_mags.size,spec_cols.size)).T
 sigma_spec_int=scipy.interpolate.RegularGridInterpolator((spec_mags,spec_cols),
     np.log10(spec_sigmas),method='linear')
 def sigma_spec(mags,cols):
+    mags=np.array(mags)
+    cols=np.array(cols)
     return 10**sigma_spec_int(np.vstack([mags,cols]).T)
 
 # equivalent for photometric errors (using DR3 RVS)
@@ -32,4 +34,6 @@ phot_sigmas = np.reshape(sigma_phot_data[2],(phot_mags.size,phot_cols.size)).T
 sigma_phot_int=scipy.interpolate.RegularGridInterpolator((phot_mags,phot_cols),
     np.log10(phot_sigmas),method='linear')
 def sigma_phot(mags,cols):
+    mags=np.array(mags)
+    cols=np.array(cols)
     return 10**sigma_phot_int(np.vstack([mags,cols]).T)
