@@ -85,7 +85,7 @@ def totalmass(ps):
 
 
 def Delta(ps):
-    ps.Delta = (ps.q-ps.l)/((1+ps.q)*(1+ps.l))
+    ps.Delta = (ps.l-ps.q)/((1+ps.q)*(1+ps.l))
     return ps.Delta
 
 
