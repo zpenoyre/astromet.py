@@ -231,12 +231,12 @@ def findEtas(ts, period, ecc, tPeri=0, N_it=10):
 
 
 def bodyPos(pxs, pys, l, q):  # given the displacements transform to c.o.m. frame
-    px1s = pxs*q/(1+q)
-    px2s = -pxs/(1+q)
-    py1s = pys*q/(1+q)
-    py2s = -pys/(1+q)
-    pxls = -pxs*(l-q)/((1+l)*(1+q))
-    pyls = -pys*(l-q)/((1+l)*(1+q))
+    px1s = -pxs*q/(1+q)
+    px2s = pxs/(1+q)
+    py1s = -pys*q/(1+q)
+    py2s = pys/(1+q)
+    pxls = pxs*(l-q)/((1+l)*(1+q))
+    pyls = pys*(l-q)/((1+l)*(1+q))
     return px1s, py1s, px2s, py2s, pxls, pyls
 
 
@@ -600,11 +600,11 @@ def radial_velocity(ts, ps, source='p'):
     if ps.a == 0:
         return np.zeros(ts.size)
     if (source == 'c') or (source == 'combined'):
-        Delta = (ps.q-ps.l)/((1+ps.q)*(1+ps.l))
+        Delta = (ps.l-ps.q)/((1+ps.q)*(1+ps.l))
     elif (source == 'p') or (source == 'primary'):
-        Delta = ps.q/(1+ps.q)
+        Delta = -ps.q/(1+ps.q)
     elif (source == 's') or (source == 'secondary'):
-        Delta = -1/(1+ps.q)
+        Delta = 1/(1+ps.q)
     etas = findEtas(ts, ps.period, ps.e, tPeri=ps.tperi)
     bracket = (np.cos(ps.vphi)*np.sin(etas) -
                np.sqrt(1-ps.e**2)*np.sin(ps.vphi)*np.cos(etas))/(1-ps.e*np.cos(etas))
