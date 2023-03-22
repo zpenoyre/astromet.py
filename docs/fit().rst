@@ -181,7 +181,7 @@ or skip the middle step and jump directly from the mock data to the gaia fit:
 ::
 
     gaia_results=astromet.gaia_fit(t_obs,x_obs,phi_obs,al_error,ra,dec)
-    print(gresults)
+    print(gaia_results)
 
 ::
 
@@ -192,19 +192,19 @@ that Gaia would find
 ::
     ax=plt.gca()
     for i in range(16): # plotting 16 random realizations of the fit including error
-    plotts=np.linspace(np.min(ts),np.max(ts),1000)
+      plotts=np.linspace(np.min(ts),np.max(ts),1000)
 
-    fit_params=astromet.params()
-    fit_params.ra=bresults['ra_ref']
-    fit_params.dec=bresults['dec_ref']
-    fit_params.drac=bresults['drac']+np.random.randn()*bresults['drac_error']
-    fit_params.ddec=bresults['ddec']+np.random.randn()*bresults['ddec_error']
-    fit_params.pmrac=bresults['pmrac']+np.random.randn()*bresults['pmrac_error']
-    fit_params.pmdec=bresults['pmdec']+np.random.randn()*bresults['pmdec_error']
-    fit_params.parallax=bresults['parallax']+np.random.randn()*bresults['parallax_error']
+      fit_params=astromet.params()
+      fit_params.ra=bresults['ra_ref']
+      fit_params.dec=bresults['dec_ref']
+      fit_params.drac=bresults['drac']+np.random.randn()*bresults['drac_error']
+      fit_params.ddec=bresults['ddec']+np.random.randn()*bresults['ddec_error']
+      fit_params.pmrac=bresults['pmrac']+np.random.randn()*bresults['pmrac_error']
+      fit_params.pmdec=bresults['pmdec']+np.random.randn()*bresults['pmdec_error']
+      fit_params.parallax=bresults['parallax']+np.random.randn()*bresults['parallax_error']
 
-    fitracs,fitdecs=astromet.track(plotts,fit_params)
-    ax.plot(fitracs,fitdecs,c='k',alpha=0.2)
+      fitracs,fitdecs=astromet.track(plotts,fit_params)
+      ax.plot(fitracs,fitdecs,c='k',alpha=0.2)
 
     # plotting the actual Gaia-like observations
     ax.scatter(rac_obs,dec_obs,s=10,alpha=0.5)
