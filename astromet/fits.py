@@ -2,6 +2,7 @@ import numpy as np
 import astropy.coordinates
 from astropy import units as u
 from astropy.time import Time
+T = (1.0*u.year).to(u.day).value
 
 from .tracks import *
 
@@ -231,6 +232,7 @@ def gaia_results(results):
         for j in range(i):
             gresults[gcoords[j]+'_'+gcoords[i]+'_corr']=\
                 results[coords[j]+'_'+coords[i]+'_corr']
+    # gaia doesn't use a reference ra and dec + offset, just recrods ra and dec in degrees
     gresults['ra']=results['ra_ref']+results['drac']*mas/np.cos(results['dec_ref'])
     gresults['dec']=results['dec_ref']+results['ddec']*mas
 
@@ -356,3 +358,36 @@ def agis(r5d, t, phi, x_err, extra=None, epoch=2016.0, G=None):
     results['uwe']= np.sqrt(np.sum(R**2 / x_err**2)/(np.sum(weights>0.2)-nparam))
 
     return results
+
+# translates the results of a fit (should work with simple and gaia fit) to a params object
+def resultsparams(results,error=False,refra=np.NaN,refdec=np.NaN):
+    rparams=params()
+    efac=0
+    if error==True:
+        efac=1
+    if 'drac' in results.keys():
+        rparams.ra=results['ra_ref']
+        rparams.dec=results['dec_ref']
+        rparams.drac=results['drac'] + efac*np.random.randn()*results['drac_error']
+        rparams.ddec=results['ddec'] + efac*np.random.randn()*results['ddec_error']
+        rparams.pmrac=results['pmrac'] + efac*np.random.randn()*results['pmrac_error']
+    else:
+        if np.isnan(refra):
+            print("looks like you're using gaiafit results(?)")
+            print("in which case you need to supply a refra and refdec")
+            print("astromet likes to work in small (mas) differences, drac and ddec")
+            print("from a reference ra and dec")
+            print("(we'll use the ra and dec given for the moment)")
+            refra=results['ra']
+            refdec=results['dec']
+        rparams.ra=refra
+        rparams.dec=refdec
+        racoffset=(results['ra']-refra)*np.cos(refdec)/mas
+        decoffset=(results['dec']-refdec)/mas
+        rparams.drac=racoffset + efac*np.random.randn()*results['ra_error']
+        rparams.ddec=decoffset + efac*np.random.randn()*results['dec_error']
+        rparams.pmrac=results['pmra'] + efac*np.random.randn()*results['pmra_error']
+    rparams.pmdec=results['pmdec'] + efac*np.random.randn()*results['pmdec_error']
+    rparams.parallax=results['parallax'] + efac*np.random.randn()*results['parallax_error']
+
+    return rparams

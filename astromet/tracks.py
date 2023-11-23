@@ -8,6 +8,7 @@ import sys
 import os
 from .lensing import *
 
+
 # Create units used elsewhere
 mSun = constants.M_sun.to(u.kg).value
 lSun = constants.L_sun.to(u.W).value
@@ -85,7 +86,7 @@ def totalmass(ps):
 
 
 def Delta(ps):
-    ps.Delta = (ps.q-ps.l)/((1+ps.q)*(1+ps.l))
+    ps.Delta = (ps.l-ps.q)/((1+ps.q)*(1+ps.l))
     return ps.Delta
 
 
@@ -204,9 +205,9 @@ def barycentricPosition(time):
 
 
 # binary orbit
-def findEtas(ts, period, ecc, tPeri=0, N_it=10):
+def findEtas(ts, period, ecc, tPeri=0, N_it=10, precision=1e-5):
     # finds eccentric anomaly with iterative Halley's method
-    phase=2*np.pi*(((ts-tPeri)/period) % 1)
+    phase=2*np.pi*(((ts-tPeri)/period) ) # deleted a %1 from brackets (24/10/23) - hope nothing breaks!
 
     sph=np.sin(phase)
     cph=np.cos(phase)
@@ -215,7 +216,7 @@ def findEtas(ts, period, ecc, tPeri=0, N_it=10):
     deltaeta=1
 
     it=0
-    while ((np.max(np.abs(deltaeta))>1e-5) & (it<N_it)):
+    while ((np.max(np.abs(deltaeta))>precision) & (it<N_it)):
     # Halley's method
         it+=1
         sineta=np.sin(eta)
@@ -225,18 +226,61 @@ def findEtas(ts, period, ecc, tPeri=0, N_it=10):
         d2f= ecc*sineta
         deltaeta  = -f*df / (df*df - 0.5*f*d2f)
         eta      += deltaeta
-    # since the Halley method converges cubically, a correction < 1e-5 at the current iteration
+    # since the Halley method converges cubically, a correction < precision=1e-5 at the current iteration
     # implies that it would be <~1e-15 at the next iteration, which is beyond the precision limit
     return eta
 
+def findEtasHyperbolic(ts, tau, ecc, tPeri=0, N_it=10, precision=1e-5):
+    # finds eccentric anomaly for unbound orbits with modified iterative Halley's method
+    # initial guess
+    phase=2*np.pi*(ts-tPeri)/tau
+    zeta=np.arcsinh(phase/ecc)
+    
+    deltazeta=1
+
+    it=0
+    while ((np.max(np.abs(deltazeta))>precision) & (it<N_it)):
+    # Halley's method
+        it+=1
+        sinhzeta=np.sinh(zeta)
+        coshzeta=np.cosh(zeta)
+        f  = ecc*sinhzeta - zeta - phase
+        df = ecc*coshzeta - 1.
+        d2f= ecc*sinhzeta
+        deltazeta  = -f*df / (df*df - 0.5*f*d2f)
+        zeta      += deltazeta
+    # since the Halley method converges cubically, a correction < precision=1e-5 at the current iteration
+    # implies that it would be <~1e-15 at the next iteration, which is beyond the precision limit
+    return zeta
+
+def findPhisParabolic(ts,tau,ecc,tPeri=0, N_it=10, precision=1e-5):
+    alpha=3*(t-tPeri)/tau
+    phi=np.sign(alpha)*np.arccos((1-alpha**2)/(1+alpha**2))
+    deltaphi=1
+    it=0
+    while ((np.max(np.abs(deltaphi))>precision) & (it<N_it)):
+    # Halley's method
+        it+=1
+        sinphi=np.sinh(phi)
+        cosphi=np.cosh(phi)
+        f  = sinphi*(2-cosphi)/(1+cosphi)**2 - alpha
+        df = (5-4*cosphi)/(1+cosphi)**2
+        d2f= 2*sinphi*(7-2*cosphi)/(1+cosphi)**3
+        deltaphi  = -f*df / (df*df - 0.5*f*d2f)
+        phi      += deltaphi
+    return phi
+
+    
+
+
 
 def bodyPos(pxs, pys, l, q):  # given the displacements transform to c.o.m. frame
-    px1s = pxs*q/(1+q)
-    px2s = -pxs/(1+q)
-    py1s = pys*q/(1+q)
-    py2s = -pys/(1+q)
-    pxls = -pxs*(l-q)/((1+l)*(1+q))
-    pyls = -pys*(l-q)/((1+l)*(1+q))
+    px1s = -pxs*q/(1+q)
+    px2s = pxs/(1+q)
+    py1s = -pys*q/(1+q)
+    py2s = pys/(1+q)
+    pxls = pxs*(l-q)/((1+l)*(1+q))
+    pyls = pys*(l-q)/((1+l)*(1+q))
     return px1s, py1s, px2s, py2s, pxls, pyls
 
 
@@ -600,11 +644,11 @@ def radial_velocity(ts, ps, source='p'):
     if ps.a == 0:
         return np.zeros(ts.size)
     if (source == 'c') or (source == 'combined'):
-        Delta = (ps.q-ps.l)/((1+ps.q)*(1+ps.l))
+        Delta = (ps.l-ps.q)/((1+ps.q)*(1+ps.l))
     elif (source == 'p') or (source == 'primary'):
-        Delta = ps.q/(1+ps.q)
+        Delta = -ps.q/(1+ps.q)
     elif (source == 's') or (source == 'secondary'):
-        Delta = -1/(1+ps.q)
+        Delta = 1/(1+ps.q)
     etas = findEtas(ts, ps.period, ps.e, tPeri=ps.tperi)
     bracket = (np.cos(ps.vphi)*np.sin(etas) -
                np.sqrt(1-ps.e**2)*np.sin(ps.vphi)*np.cos(etas))/(1-ps.e*np.cos(etas))
@@ -649,7 +693,7 @@ def seperation(ts, ps, phis=None):
 # ----------------------
 # -Utilities
 # ----------------------
-# returns a number to a given significant digits (if extra true also returns exponent)
+
 
 def viewing_angles(la, i, ap):
     """Converts conentional orbital elements to our coordinate system
@@ -669,7 +713,7 @@ def viewing_angles(la, i, ap):
     vomega = np.arctan2(num, denom)
     return vtheta, vphi, vomega
 
-
+# returns a number to a given significant digits (if extra true also returns exponent)
 def sigString(number, significantFigures, extra=False):
     roundingFactor = significantFigures - int(np.floor(np.log10(np.abs(number)))) - 1
     rounded = np.round(number, roundingFactor)
@@ -683,8 +727,6 @@ def sigString(number, significantFigures, extra=False):
         return string, roundingFactor
 
 # generating, sampling and fitting a split normal (see https://authorea.com/users/107850/articles/371464-direct-parameter-finding-of-the-split-normal-distribution)
-
-
 def splitNormal(x, mu, sigma, cigma):
     epsilon = cigma/sigma
     alphas = sigma*np.ones_like(x)
@@ -729,3 +771,31 @@ def splitFit(xs):  # fits a split normal distribution to an array of data
     Z = ks[np.argmin(np.abs(phi_ks))]
 
     return xs[Z], sigma, cigma
+
+# ----------------------
+# -Plots
+# ----------------------
+def plottrack(ts,params,ax=0,s=5,c=None,alpha=0.5,lw=0,ls='-',nts=1000):
+    if ax==0:
+        ax=plt.gca()
+    if len(ts)==2: # if we just give two times treats these as start and end and generates nts times
+        ts=np.linspace(ts[0],ts[1],nts)
+    dracs,ddecs=track(ts, params)
+    if lw==0:
+        if c!=None:
+            ax.scatter(dracs,ddecs,c=c,s=s,alpha=alpha)
+        else:
+            ax.scatter(dracs,ddecs,s=s,alpha=alpha)
+    else:
+        if c!=None:
+            ax.plot(dracs,ddecs,c=c,alpha=alpha,lw=lw,ls=ls)
+        else:
+            ax.plot(dracs,ddecs,alpha=alpha,lw=lw,ls=ls)
+    return ax
+
+def plotresults(ts,results,error=False,refra=np.NaN,refdec=np.NaN,
+        ax=0,s=5,c=None,alpha=0.5,lw=0,ls='-',nts=1000):
+    from .fits import resultsparams
+    rparams=resultsparams(results,error=error,refra=refra,refdec=refdec)
+    ax=plottrack(ts,rparams,ax=ax,s=s,c=c,alpha=alpha,lw=lw,ls=ls,nts=nts)
+    return ax
