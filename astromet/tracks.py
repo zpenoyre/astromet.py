@@ -254,15 +254,15 @@ def findEtasHyperbolic(ts, tau, ecc, tPeri=0, N_it=10, precision=1e-5):
     return zeta
 
 def findPhisParabolic(ts,tau,ecc,tPeri=0, N_it=10, precision=1e-5):
-    alpha=3*(t-tPeri)/tau
+    alpha=3*(ts-tPeri)/tau
     phi=np.sign(alpha)*np.arccos((1-alpha**2)/(1+alpha**2))
     deltaphi=1
     it=0
     while ((np.max(np.abs(deltaphi))>precision) & (it<N_it)):
     # Halley's method
         it+=1
-        sinphi=np.sinh(phi)
-        cosphi=np.cosh(phi)
+        sinphi=np.sin(phi)
+        cosphi=np.cos(phi)
         f  = sinphi*(2-cosphi)/(1+cosphi)**2 - alpha
         df = (5-4*cosphi)/(1+cosphi)**2
         d2f= 2*sinphi*(7-2*cosphi)/(1+cosphi)**3
