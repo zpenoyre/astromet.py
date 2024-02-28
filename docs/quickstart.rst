@@ -41,9 +41,9 @@ Let's start with a simple single body example:
     params.dec=-50    #[deg]
     params.drac=0     #[mas]
     params.ddec=0     #[mas]
-    params.pmrac=8    #[mas/yr]
-    params.pmdec=-2   #[mas/yr]
-    params.parallax=1     #[mas]
+    params.pmrac=4    #[mas/yr]
+    params.pmdec=3   #[mas/yr]
+    params.parallax=2     #[mas]
 
 All we need now is some times at which we want to find the position
 ::
@@ -61,7 +61,7 @@ and plot it
 ::
 
     ax=plt.gca()
-    ax.scatter(racs,decs)
+    ax.scatter(racs,decs,c=ts)
     ax.set_xlabel(r'$RA \cos(Dec)$ [mas]')
     ax.set_ylabel(r'$Dec$ [mas]')
     plt.show()
@@ -106,8 +106,8 @@ of all variables involving the binary)
     bracs,bdecs=astromet.track(ts,params)
 
     ax=plt.gca()
-    ax.scatter(racs,decs)
-    ax.scatter(bracs,bdecs)
+    ax.scatter(racs,decs,c=ts)
+    ax.scatter(bracs,bdecs,c=ts,cmap='magma_r')
     ax.set_xlabel(r'$RA \cos(Dec)$ [mas]')
     ax.set_ylabel(r'$Dec$ [mas]')
     plt.show()
