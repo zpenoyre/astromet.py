@@ -772,7 +772,7 @@ def splitFit(xs):  # fits a split normal distribution to an array of data
 
     return xs[Z], sigma, cigma
 
-# converts a phpase (phi in radians) to a time in years
+# converts a phase (phi in radians) to a time in years
 # rp should be in AU and Mtotal in Msun
 def phi_to_t(phi,rp,e,Mtotal,tPeri=0):
     cphi=np.cos(phi)
