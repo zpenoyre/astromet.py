@@ -772,6 +772,48 @@ def splitFit(xs):  # fits a split normal distribution to an array of data
 
     return xs[Z], sigma, cigma
 
+# converts a phpase (phi in radians) to a time in years
+# rp should be in AU and Mtotal in Msun
+def phi_to_t(phi,rp,e,Mtotal,tPeri=0):
+    cphi=np.cos(phi)
+    sphi=np.sin(phi)
+    if e==1:
+        tau=np.sqrt((rp*(1+e))**3 /(Galt*Mtotal))
+        return tau*sphi*(2+cphi)/(3*(1+cphi)**2)+tPeri
+    if e<1:
+        norbit=np.floor((phi+np.pi)/(2*np.pi))
+        ceta=(cphi+e)/(1+e*cphi)
+        seta=np.sqrt(1-e**2)*sphi/(1+e*cphi)
+        eta=np.arctan2(seta,ceta)
+        tau=np.sqrt((rp/(1-e))**3 /(Galt*Mtotal))
+        return tau*(eta-e*seta+2*np.pi*norbit)+tPeri
+    if e>1:
+        chzeta=(cphi+e)/(1+e*cphi)
+        shzeta=np.sqrt(e**2 - 1)*sphi/(1+e*cphi)
+        zeta=np.arctanh(shzeta/chzeta)
+        tau=np.sqrt(np.abs(rp/(1-e))**3 /(Galt*Mtotal))
+        return tau*(e*shzeta-zeta)+tPeri
+    
+# inverse of above function
+def t_to_phi(t,rp,e,Mtotal,tPeri=0):
+    if e==1:
+        tau=np.sqrt((rp*(1+e))**3 /(Galt*Mtotal))
+        phi=findPhisParabolic(t,tau,tPeri=tPeri)
+    if e<1:
+        tau=2*np.pi*np.sqrt((rp/(1-e))**3 /(Galt*Mtotal))
+        norbit=np.floor(0.5+(t-tPeri)/tau)
+        eta=findEtas(t,tau,e,tPeri=tPeri)
+        cphi=(np.cos(eta)-e)/(1-e*np.cos(eta))
+        sphi=np.sqrt(1-e**2)*np.sin(eta)/(1-e*np.cos(eta))
+        phi=np.arctan2(sphi,cphi)+2*np.pi*norbit
+    if e>1:
+        tau=2*np.pi*np.sqrt(np.abs(rp/(1-e))**3 /(Galt*Mtotal))
+        zeta=findEtasHyperbolic(t,tau,e,tPeri=tPeri)
+        cphi=(e-np.cosh(zeta))/(e*np.cosh(zeta)-1)
+        sphi=np.sqrt(e**2-1)*np.sinh(zeta)/(e*np.cosh(zeta)-1)
+        phi=np.arctan2(sphi,cphi)
+    return phi
+
 # ----------------------
 # -Plots
 # ----------------------
