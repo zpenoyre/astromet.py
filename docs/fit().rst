@@ -104,6 +104,8 @@ we can even use appropriate Gaia-like astrometric error!
     al_error=astromet.sigma_ast(mag) # about 1.1 mas at this magnitude
     errs=al_error*np.random.randn(phis.size)
 
+    radphis=np.deg2rad(phis)
+
     obsracs=racs+errs*np.sin(radphis)
     obsdecs=decs+errs*np.cos(radphis)
 
@@ -111,8 +113,6 @@ we can even use appropriate Gaia-like astrometric error!
     plotracs,plotdecs=astromet.track(plotts,params)
 
     ax=plt.gca()
-    radphis=np.deg2rad(phis)
-    for i in range(ts.size):
     ax.plot([obsracs-al_error*np.sin(radphis),obsracs+al_error*np.sin(radphis)],
             [obsdecs-al_error*np.cos(radphis),obsdecs+al_error*np.cos(radphis)],c='orange')
     ax.plot(plotracs,plotdecs,c='k')
