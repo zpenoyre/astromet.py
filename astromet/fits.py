@@ -140,7 +140,7 @@ def mock_obs(ts, phis, racs, decs, err=0, nmeasure=9):
     (i.e. 1D positions along some scan angle, optionlly with errors added)
     Args:
         - ts,       ndarray - Observation times, jyear.
-        - phis,     ndarray - Scanning angles (0 north, 90 east), degrees.
+        - phis,     ndarray - Scanning angles (0 north, pi/2 east), radians.
         - racs,     ndarray - RAcosDec at each scan, mas
         - decs,     ndarray - Dec at each scan, mas
         - err,      float or ndarray - optional normal distributed error to be added (default 0)
@@ -151,10 +151,9 @@ def mock_obs(ts, phis, racs, decs, err=0, nmeasure=9):
     """
     ts= np.repeat(ts, nmeasure)
     phis= np.repeat(phis, nmeasure)
-    errs=err*np.random.randn(ts.size)
-    racs= np.repeat(racs, nmeasure) + errs*np.sin(np.deg2rad(phis))
-    decs= np.repeat(decs, nmeasure) + errs*np.cos(np.deg2rad(phis))
-    xs=racs*np.sin(np.deg2rad(phis)) + decs*np.cos(np.deg2rad(phis))
+    racs= np.repeat(racs, nmeasure) + err*np.random.randn(ts.size)*np.sin(phis)
+    decs= np.repeat(decs, nmeasure) + err*np.random.randn(ts.size)*np.cos(phis)
+    xs=racs*np.sin(phis) + decs*np.cos(phis)
     return ts,xs,phis,racs,decs
 
 
@@ -299,7 +298,7 @@ def agis(r5d, t, phi, x_err, extra=None, epoch=2016.0, G=None):
     Args:
         - r5d,        ndarray - 5D astrometry of source - (ra, dec (deg), parallax (mas), mura, mudec (mas/y))
         - t,          ndarray - source observation times - (julian days relative to Gaia observation start?)
-        - phi,        ndarray - source observation scan angles
+        - phi,        ndarray - source observation scan angles, radians
         - x_err,      ndarray - scan measurement error
         - extra,  function or None - Takes times and returns offset of centroid from CoM in mas.
     Returns:
@@ -335,7 +334,7 @@ def agis(r5d, t, phi, x_err, extra=None, epoch=2016.0, G=None):
     x_obs  = np.matmul(design, r5d)
     # Excess motion
     if extra is not None:
-        x_obs += np.sum(np.vstack((np.sin(np.deg2rad(phi)), np.cos(np.deg2rad(phi))))*extra(t), axis=0)
+        x_obs += np.sum(np.vstack((np.sin(phi), np.cos(phi)))*extra(t), axis=0)
     # Measurement Error
     x_obs += np.random.normal(0, x_err)
 

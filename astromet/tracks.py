@@ -182,9 +182,8 @@ def design_matrix(ts, ra, dec, phis=None, epoch=2016.0):
 
     if np.size(phis) > 1:
         # sin and cos angles
-        angles = np.deg2rad(phis)
-        sina = np.sin(angles)
-        cosa = np.cos(angles)
+        sina = np.sin(phis)
+        cosa = np.cos(phis)
 
         # Construct design matrix
         design = design[0]*sina[:, None] + design[1]*cosa[:, None]
@@ -235,7 +234,7 @@ def findEtasHyperbolic(ts, tau, ecc, tPeri=0, N_it=10, precision=1e-5):
     # initial guess
     phase=2*np.pi*(ts-tPeri)/tau
     zeta=np.arcsinh(phase/ecc)
-    
+
     deltazeta=1
 
     it=0
@@ -270,7 +269,7 @@ def findPhisParabolic(ts,tau,tPeri=0, N_it=10, precision=1e-5):
         phi      += deltaphi
     return phi
 
-    
+
 
 
 
@@ -793,7 +792,7 @@ def phi_to_t(phi,rp,e,Mtotal,tPeri=0):
         zeta=np.arctanh(shzeta/chzeta)
         tau=np.sqrt(np.abs(rp/(1-e))**3 /(Galt*Mtotal))
         return tau*(e*shzeta-zeta)+tPeri
-    
+
 # inverse of above function
 def t_to_phi(t,rp,e,Mtotal,tPeri=0):
     if e==1:
