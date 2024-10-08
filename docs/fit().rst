@@ -19,7 +19,7 @@ to the scan direction - with the former being a much more accurate measurement t
 (by a factor of about 5?). For dim sources (G>13) only along scan measurements are recorded.
 
 Working with angles such that 0 degrees points towards Equatorial North and 90 degrees towards East
-we can define a set of viewing angles, or better yet use the nominal Gaia scanning-law_ to find the actual
+we can define a set of viewing angles, or better yet use the nominal Gaia scanning-law (now with predicted observations all the way to the end of DR5! gaiascanlaw on github) to find the actual
 times and angles Gaia visited a patch of sky.
 
 ::
@@ -27,22 +27,13 @@ times and angles Gaia visited a patch of sky.
     import astromet
     import numpy as np
     import matplotlib.pyplot as plt
-    import scanninglaw
-
-    # slow step - takes ≈30 seconds for me - run only once
-    dr3_sl=scanninglaw.times.Times(version='dr3_nominal')
+    import gaiascanlaw
 
     ra=160
     dec=-50
-    c=scanninglaw.source.Source(ra,dec,unit='deg')
 
-    sl=dr3_sl(c, return_times=True, return_angles=True)
-
-    ts=np.squeeze(np.hstack(sl['times'])).astype('double')
-    sort=np.argsort(ts)
-    ts=2010+ts[sort]/365.25
-    phis=np.squeeze(np.hstack(sl['angles']))[sort].astype('double')
-
+    # scan times (decimal year) and angles (radians) for each transit in DR3
+    ts,phis=gaiascanlaw.scanlaw(ra,dec,tend=gaiascanlaw.times[3])
 
 N.B. we could also use the scanning law data directly from a GOST_ web query,
 though we would need to convert the times to years (from BJD) and the angles to

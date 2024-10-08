@@ -31,8 +31,6 @@ tbegin = 2014.6670  # time (in years) of Gaia's first observations
 # ----------------
 # -User functions
 # ----------------
-
-
 class params():
     def __init__(self):
         # astrometric parameters

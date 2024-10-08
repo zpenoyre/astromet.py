@@ -151,8 +151,9 @@ def mock_obs(ts, phis, racs, decs, err=0, nmeasure=9):
     """
     ts= np.repeat(ts, nmeasure)
     phis= np.repeat(phis, nmeasure)
-    racs= np.repeat(racs, nmeasure) + err*np.random.randn(ts.size)*np.sin(phis)
-    decs= np.repeat(decs, nmeasure) + err*np.random.randn(ts.size)*np.cos(phis)
+    errs=err*np.random.randn(ts.size)
+    racs= np.repeat(racs, nmeasure) + errs*np.sin(phis)
+    decs= np.repeat(decs, nmeasure) + errs*np.cos(phis)
     xs=racs*np.sin(phis) + decs*np.cos(phis)
     return ts,xs,phis,racs,decs
 
