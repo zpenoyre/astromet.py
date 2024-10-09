@@ -95,17 +95,15 @@ we can even use appropriate Gaia-like astrometric error!
     al_error=astromet.sigma_ast(mag) # about 1.1 mas at this magnitude
     errs=al_error*np.random.randn(phis.size)
 
-    radphis=np.deg2rad(phis)
-
-    obsracs=racs+errs*np.sin(radphis)
-    obsdecs=decs+errs*np.cos(radphis)
+    obsracs=racs+errs*np.sin(phis)
+    obsdecs=decs+errs*np.cos(phis)
 
     plotts=np.linspace(np.min(ts),np.max(ts),1000)
     plotracs,plotdecs=astromet.track(plotts,params)
 
     ax=plt.gca()
-    ax.plot([obsracs-al_error*np.sin(radphis),obsracs+al_error*np.sin(radphis)],
-            [obsdecs-al_error*np.cos(radphis),obsdecs+al_error*np.cos(radphis)],c='orange')
+    ax.plot([obsracs-al_error*np.sin(phis),obsracs+al_error*np.sin(phis)],
+            [obsdecs-al_error*np.cos(phis),obsdecs+al_error*np.cos(phis)],c='orange')
     ax.plot(plotracs,plotdecs,c='k')
     ax.set_xlabel(r'$RA \cos(Dec)$ [mas]')
     ax.set_ylabel(r'$Dec$ [mas]')

@@ -165,7 +165,7 @@ def fit(ts, xs, phis, xerr, ra, dec, G=12, epoch=2016.0):
     Args:
         - ts,          ndarray - source observation times, jyear
         - xs,          ndarray - source 1d positions relative to ra,dec , mas
-        - phis,        ndarray - source observation scan angles, deg
+        - phis,        ndarray - source observation scan angles, radians
         - errs,        ndarray - scan measurement error, mas
         - ra,          float - RA for design_1d, deg
         - dec,         float - Dec for design_1d, deg
