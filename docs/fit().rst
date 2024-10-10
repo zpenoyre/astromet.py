@@ -18,8 +18,8 @@ For bright sources Gaia measures positions both along (parallel) and across (per
 to the scan direction - with the former being a much more accurate measurement than the latter
 (by a factor of about 5?). For dim sources (G>13) only along scan measurements are recorded.
 
-Working with angles such that 0 degrees points towards Equatorial North and 90 degrees towards East
-we can define a set of viewing angles, or better yet use the nominal Gaia scanning-law (now with predicted observations all the way to the end of DR5! gaiascanlaw on github) to find the actual
+Working with angles (update: in radians!) such that 0 points towards Equatorial North and pi/2 degrees towards East
+we can define a set of viewing angles, or better yet use the nominal Gaia scanning-law (now with predicted observations all the way to the end of DR5! gaiascanlaw_ on github) to find the actual
 times and angles Gaia visited a patch of sky.
 
 ::
@@ -206,5 +206,5 @@ that Gaia would find
   :width: 400
   :alt: gaia-like observations of a binary and the range of (1-body) best fits
 
-.. _scanning-law: https://github.com/gaiaverse/scanninglaw
+.. _gaiascanlaw: https://github.com/zpenoyre/gaiascanlaw
 .. _GOST: https://gaia.esac.esa.int/gost/index.jsp
