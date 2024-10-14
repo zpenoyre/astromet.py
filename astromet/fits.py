@@ -210,6 +210,7 @@ def fit(ts, xs, phis, xerr, ra, dec, G=12, epoch=2016.0):
     results['uwe']= np.sqrt(np.sum(R**2 / xerr**2)/(np.sum(weights>0.2)-nparam))
     results['ra_ref']=ra
     results['dec_ref']=dec
+    results['epoch']=epoch
 
     return results
 
@@ -240,6 +241,7 @@ def gaia_results(results):
     gresults['astrometric_chi2_al']=results['chi2']
     gresults['astrometric_n_good_obs_al']=results['n_good_obs']
     gresults['uwe']=results['uwe']
+    gresults['epoch']=results['epoch']
     return gresults
 
 def simple_fit(ts, racs, decs, errs, ra, dec, G=12, epoch=2016.0):
@@ -286,11 +288,12 @@ def simple_fit(ts, racs, decs, errs, ra, dec, G=12, epoch=2016.0):
     results['uwe']= uwe
     results['ra_ref']=ra
     results['dec_ref']=dec
+    results['epoch']=epoch
 
     return results
 
 def gaia_fit(ts, xs, phis, xerr, ra, dec, G=12, epoch=2016.0):
-    return gaia_results(fit(ts, xs, phis, xerr, ra, dec, G=12, epoch=2016.0))
+    return gaia_results(fit(ts, xs, phis, xerr, ra, dec, G=12, epoch=epoch))
 
 # keeping below for reference, effectively same as gaia_fit() but with slightly different use case/input
 def agis(r5d, t, phi, x_err, extra=None, epoch=2016.0, G=None):
@@ -356,11 +359,12 @@ def agis(r5d, t, phi, x_err, extra=None, epoch=2016.0, G=None):
     results['astrometric_n_good_obs_al']= np.sum(weights>0.2)
     nparam=5 #results['astrometric_params_solved'].bit_count()
     results['uwe']= np.sqrt(np.sum(R**2 / x_err**2)/(np.sum(weights>0.2)-nparam))
+    results['epoch']=epoch
 
     return results
 
 # translates the results of a fit (should work with simple and gaia fit) to a params object
-def resultsparams(results,error=False,refra=np.NaN,refdec=np.NaN):
+def resultsparams(results,error=False,refra=np.nan,refdec=np.nan):
     rparams=params()
     efac=0
     if error==True:
@@ -389,5 +393,6 @@ def resultsparams(results,error=False,refra=np.NaN,refdec=np.NaN):
         rparams.pmrac=results['pmra'] + efac*np.random.randn()*results['pmra_error']
     rparams.pmdec=results['pmdec'] + efac*np.random.randn()*results['pmdec_error']
     rparams.parallax=results['parallax'] + efac*np.random.randn()*results['parallax_error']
+    rparams.epoch=results['epoch']
 
     return rparams

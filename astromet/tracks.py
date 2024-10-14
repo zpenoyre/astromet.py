@@ -832,7 +832,7 @@ def plottrack(ts,params,ax=0,s=5,c=None,alpha=0.5,lw=0,ls='-',nts=1000):
             ax.plot(dracs,ddecs,alpha=alpha,lw=lw,ls=ls)
     return ax
 
-def plotresults(ts,results,error=False,refra=np.NaN,refdec=np.NaN,
+def plotresults(ts,results,error=False,refra=np.nan,refdec=np.nan,
         ax=0,s=5,c=None,alpha=0.5,lw=0,ls='-',nts=1000):
     from .fits import resultsparams
     rparams=resultsparams(results,error=error,refra=refra,refdec=refdec)

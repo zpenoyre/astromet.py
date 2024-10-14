@@ -6,7 +6,7 @@ except ImportError:
 #from distutils.extension import Extension
 
 setup(name="astromet",
-      version='1.1.5',
+      version='1.1.9',
       description='One and two body astrometry',
       author='Zephyr Penoyre',
       author_email='zephyrpenoyre@gmail.com',
@@ -16,4 +16,5 @@ setup(name="astromet",
       install_requires=['numpy','astropy','scipy'],
       include_package_data=True,
       package_data={'': ['data/*.csv']},
+      long_description='https://astrometpy.readthedocs.io/en/latest/index.html'
       )
