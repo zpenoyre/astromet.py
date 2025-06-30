@@ -299,7 +299,7 @@ def binaryMotion(ts, P, q, l, a, e, vTheta, vPhi, tPeri=0):  # binary position (
 # ----------------------
 # -Analytic solutions
 # ----------------------
-
+# unfinished
 
 def sigmagamma(eta1, eta2):
     deta = eta2-eta1
@@ -636,8 +636,8 @@ def dtheta_old(ps, t1, t2):
 
 
 def radial_velocity(ts, ps, source='p'):
-    # are we seeing the radial veloicty of the photocenter (combined)
-    # or of the primary or secondary?
+    # source: are we seeing the radial velocity of the photocenter (combined)
+    # or of the primary ('p') or secondary ('s')?
     if ps.a == 0:
         return np.zeros(ts.size)
     if (source == 'c') or (source == 'combined'):
@@ -703,9 +703,9 @@ def viewing_angles(la, i, ap):
         vphi (radians): azimuthal viewing angle
         vomega (radians): rotation of the viewing plane
     """
-    vtheta = i
-    vphi = la - np.pi/2
-    num = np.cos(la)*np.sin(ap) + np.sin(la)*np.cos(i)*np.cos(ap)
+    vtheta = np.pi - i
+    vphi = np.pi/2 - la
+    num = np.sin(la)*np.cos(ap) + np.cos(la)*np.cos(i)*np.sin(ap)
     denom = np.cos(la)*np.cos(ap) - np.sin(la)*np.cos(i)*np.sin(ap)
     vomega = np.arctan2(num, denom)
     return vtheta, vphi, vomega
@@ -771,6 +771,7 @@ def splitFit(xs):  # fits a split normal distribution to an array of data
 
 # converts a phase (phi in radians) to a time in years
 # rp should be in AU and Mtotal in Msun
+# note that seems unreliable for phi=pi (but fine for infinitesimally below)
 def phi_to_t(phi,rp,e,Mtotal,tPeri=0):
     cphi=np.cos(phi)
     sphi=np.sin(phi)
