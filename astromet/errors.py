@@ -7,10 +7,11 @@ import scipy
 local_dir = os.path.dirname(__file__)  # <-- absolute dir the script is in
 
 ast_abs_file_path = local_dir+'/data/scatteral_edr3.csv'
-sigma_al_data = np.genfromtxt(ast_abs_file_path, skip_header=1, delimiter=',', unpack=True)
+sigma_al_data = np.genfromtxt(ast_abs_file_path, skip_header=0, delimiter=',', unpack=True)
 mags = sigma_al_data[0]
 sigma_als = sigma_al_data[1]
-sigma_ast = scipy.interpolate.interp1d(mags, sigma_als, bounds_error=False)
+def sigma_ast(ms):
+ return np.interp(ms,mags, sigma_als)
 
 # equivalent for spectroscopic errors (using DR3 RVS)
 spec_abs_file_path=local_dir+'/data/dr3_rvs_spec_error.csv'
