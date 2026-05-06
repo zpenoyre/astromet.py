@@ -134,7 +134,7 @@ def fit_model(x_obs, x_err, M_matrix, prior=None):
 
     return r5d_mean, r5d_cov, R, aen, weights
 
-def mock_obs(ts, phis, racs, decs, err=0, nmeasure=9):
+def mock_obs(ts, phis, racs, decs, err=0, acerr=0, nmeasure=9):
     """
     Converts positions to comparable observables to real astrometric measurements
     (i.e. 1D positions along some scan angle, optionlly with errors added)
@@ -153,7 +153,9 @@ def mock_obs(ts, phis, racs, decs, err=0, nmeasure=9):
     phis= np.repeat(phis, nmeasure)
     errs=err*np.random.randn(ts.size)
     racs= np.repeat(racs, nmeasure) + errs*np.sin(phis)
+    racs= racs + acerr*np.random.randn(racs.size)*np.cos(phis)
     decs= np.repeat(decs, nmeasure) + errs*np.cos(phis)
+    decs= decs - acerr*np.random.randn(decs.size)*np.sin(phis)
     xs=racs*np.sin(phis) + decs*np.cos(phis)
     return ts,xs,phis,racs,decs
 
@@ -211,7 +213,6 @@ def fit(ts, xs, phis, xerr, ra, dec, G=12, epoch=2016.0):
     results['ra_ref']=ra
     results['dec_ref']=dec
     results['epoch']=epoch
-
     return results
 
 def gaia_results(results):
