@@ -8,3 +8,6 @@ dist
 build
 docs/_build/
 Icon\r\r
+example1.csv
+example2.csv
+example_triple.ipynb

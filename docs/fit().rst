@@ -4,7 +4,7 @@ fit()
 In the quickstart we've shown how to generate a 2D astrometric track (in RA cos(Dec) and Dec)
 and to fit a single body motion to that data.
 
-However, this issn't a perfect replica of the data Gaia records, nor how it is fitted.
+However, this isn't a perfect replica of the data Gaia records, nor how it is fitted.
 
 In this section we'll bridge that gap to give as exact an analog as possible to the gaia results and pipeline.
 
@@ -16,7 +16,7 @@ is along a particular axis - the scanning angle.
 
 For bright sources Gaia measures positions both along (parallel) and across (perpendicular)
 to the scan direction - with the former being a much more accurate measurement than the latter
-(by a factor of about 5?). For dim sources (G>13) only along scan measurements are recorded.
+(by a factor of about 3). For dim sources (G>13) only along scan measurements are recorded.
 
 Working with angles (update: in radians!) such that 0 points towards Equatorial North and pi/2 degrees towards East
 we can define a set of viewing angles, or better yet use the nominal Gaia scanning-law (now with predicted observations all the way to the end of DR5! gaiascanlaw_ on github) to find the actual
