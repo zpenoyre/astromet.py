@@ -6,7 +6,7 @@ and to fit a single body motion to that data.
 
 However, this isn't a perfect replica of the data Gaia records, nor how it is fitted.
 
-In this section we'll bridge that gap to give as exact an analog as possible to the gaia results and pipeline.
+In this section we'll bridge that gap to give as exact an analog as possible to the gaia results and pipeline. 
 
 scanning angles
 ---------------

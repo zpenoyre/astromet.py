@@ -10,7 +10,7 @@ When another object from our Galaxy passes in front of the source star, its mass
 
 What we would see in astrometry is the weighted average of the positions of those images (and possibly also the luminous lens) which deviates from the source position.
 
-In the following page, we will first plot the track of the source that we would see if the lens didn't deflect its light. Then we will take into account the lensing effect and recover the track that we will actually see. Unlike in the example with binary systems, we will deal with changes in brightness caused by the lensing; we will recover them too, as they might influence accuracy of the astrometric observations.
+In the following page, we will first plot the track of the source that we would see if the lens didn't deflect its light. Then we will take into account the lensing effect and recover the track that we will actually see. Unlike in the example with binary systems, we will deal with changes in brightness caused by the lensing; we will recover them too, as they might influence accuracy of the astrometric observations. 
 
 
 

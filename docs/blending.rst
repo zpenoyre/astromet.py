@@ -5,7 +5,7 @@ introduction
 ------------
 
 For now, we dealt with average positions of two stars bound in a binary system. But if two unrelated stars are very nearby, they can also be blended - unresolved and detected as just one light source. Blending is more frequent in dense fields, such as those in the Galactic plane and especially near the Galactic centre.
-In Gaia data, we can expect light sources to be blended if they are closer than 200 mas apart. We assume that Gaia will then detect a single source, and its measured position will be a weighted average of positions of contributing stars, with weights being their fluxes.
+In Gaia data, we can expect light sources to be blended if they are closer than 200 mas apart. We assume that Gaia will then detect a single source, and its measured position will be a weighted average of positions of contributing stars, with weights being their fluxes. 
 
 simple tracks
 -------------

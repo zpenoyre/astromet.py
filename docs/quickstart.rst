@@ -23,7 +23,7 @@ to define the parallax ellipse but only need be accurate to arcsecond level.
 
 The actual tracks and fitting are expressed in local delta RA cos(Dec) and delta Dec
 (drac and ddec for short) in milli-arcseconds - which is a much more appropriate
-unit for the motion of stars.
+unit for the motion of stars. 
 
 single body
 -----------
