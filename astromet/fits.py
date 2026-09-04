@@ -235,7 +235,7 @@ def gaia_results(results):
             gresults[gcoords[j]+'_'+gcoords[i]+'_corr']=\
                 results[coords[j]+'_'+coords[i]+'_corr']
     # gaia doesn't use a reference ra and dec + offset, just recrods ra and dec in degrees
-    gresults['ra']=results['ra_ref']+results['drac']*mas/np.cos(results['dec_ref'])
+    gresults['ra']=results['ra_ref']+results['drac']*mas/np.cos(results['dec_ref']*np.pi/180)
     gresults['dec']=results['dec_ref']+results['ddec']*mas
 
     gresults['astrometric_excess_noise']=results['excess_noise']
@@ -387,7 +387,7 @@ def resultsparams(results,error=False,refra=np.nan,refdec=np.nan):
             refdec=results['dec']
         rparams.ra=refra
         rparams.dec=refdec
-        racoffset=(results['ra']-refra)*np.cos(refdec)/mas
+        racoffset=(results['ra']-refra)*np.cos(np.pi*refdec/180)/mas
         decoffset=(results['dec']-refdec)/mas
         rparams.drac=racoffset + efac*np.random.randn()*results['ra_error']
         rparams.ddec=decoffset + efac*np.random.randn()*results['dec_error']
